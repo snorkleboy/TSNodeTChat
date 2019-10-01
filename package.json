@@ -1,0 +1,17 @@
+{
+  "name": "tstest",
+  "version": "1.0.0",
+  "description": "",
+  "main": "test.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^12.7.8",
+    "bindings": "^1.5.0",
+    "socket-peek": "0.0.8",
+    "typescript": "^3.6.3"
+  }
+}
