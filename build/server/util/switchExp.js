@@ -1,7 +1,9 @@
 "use strict";
 exports.__esModule = true;
 var isFunction = function (thing) { return typeof thing === 'function'; };
+var defStr = "default";
 exports.when = function (condition, value) { return [condition, value]; };
+exports.def = function (_def) { return [defStr, _def]; };
 exports.match = function (thing) {
     var whens = [];
     for (var _i = 1; _i < arguments.length; _i++) {
@@ -21,10 +23,19 @@ exports.match = function (thing) {
             break;
         }
     }
+    if (!activated) {
+        var possibleDef = whens[whens.length - 1];
+        if (possibleDef[0] === defStr) {
+            ret = isFunction(possibleDef[1]) ? possibleDef[1]() : possibleDef[1];
+        }
+    }
     return ret;
 };
 var testWhen = function (when, value) {
     var ret = undefined;
+    if (when[0] !== defStr) {
+        return { conditionMet: false, ret: ret };
+    }
     var conditionMet = isFunction(when[0]) ?
         when[0](value) :
         when[0] === value;

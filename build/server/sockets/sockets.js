@@ -1,14 +1,5 @@
 "use strict";
 exports.__esModule = true;
-// enum ClientType{
-//     noClient = "NOCLIENT",
-//     withClient="WITHCLIENT"
-// }
-// class User{
-//     socket:ISocket
-//     clientType: ClientType
-//     write:Function
-// }
 var Sockets = /** @class */ (function () {
     function Sockets() {
         var _this = this;
