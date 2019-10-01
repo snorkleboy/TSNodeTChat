@@ -1,3 +1,3 @@
 import { startServer} from "./server";
-startServer();
-
+const {tcpServer,httpServer} = startServer();
+tcpServer.on("error", (e) => console.error("tcp server",{ e }));
