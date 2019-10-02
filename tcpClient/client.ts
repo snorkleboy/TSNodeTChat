@@ -23,6 +23,7 @@ class Client{
         this.publicCommands["/h"].action = () => console.log(
             Object.entries(this.publicCommands).map(([command, entry]) => `${command}-${entry}`)
         )
+        this.socket.on("data",chunk=>this.receiveData(chunk))
     };
     publicCommands = {
         "/h": { name: 'help',action:null },
@@ -39,7 +40,7 @@ class Client{
     setState = (inState)=>{
         this.state = {...this.state,...inState}
     }
-
+    receiveData = (chunk)=>console.log(chunk.toString("utf8"))
     start = async () => {
         while (!this.state.close) {
             await this.promptReducer();
@@ -54,13 +55,15 @@ class Client{
     )
     inputReducer = (input:string)=>match({input,state:this.state},
         ...Object.entries(this.publicCommands)
-            .map(([name, command]) => when(({input})=>input===name, () => command.action()) ),
-        def(({ input }) => this.writeToServer(this.createTextMessage(input)) || console.log({input}))
+            .map(([name, command]) =>(
+                when(({input})=>input===name, () => command.action()) 
+            )),
+        def(({ input }) => this.writeToServer(this.createTextMessage(input)))
     );
     writeToServer = (msg: IMessage) => {
         const txt = JSON.stringify(msg);
         console.log({ txt, msg});
-        this.socket.write(JSON.stringify(txt));
+        this.socket.write(txt);
         return false;
     }
     createTextMessage = (msg:string):IMessage=>({

@@ -1,13 +1,10 @@
 import {Sockets} from "./sockets"
 import { messageHandler as defaultMessageHandler} from "../messageHandler/messageHandler"
 function socketConfigurer(thisId, socket, socketStore: Sockets, messageHandler ) {
-    socket.setEncoding('utf8');
     socketStore.addSocket(thisId, socket);
     socket.on('data', (receivedDataChunk) => {
         try {
-            const data = receivedDataChunk.toString('utf8');
-            console.log({ data });
-            const parsed = JSON.parse(data);
+            const parsed = JSON.parse(receivedDataChunk);
             messageHandler(parsed, socketStore);
         } catch (error) {
             console.error({ error,receivedDataChunk});

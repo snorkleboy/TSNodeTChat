@@ -2,13 +2,10 @@
 exports.__esModule = true;
 var messageHandler_1 = require("../messageHandler/messageHandler");
 function socketConfigurer(thisId, socket, socketStore, messageHandler) {
-    socket.setEncoding('utf8');
     socketStore.addSocket(thisId, socket);
     socket.on('data', function (receivedDataChunk) {
         try {
-            var data = receivedDataChunk.toString('utf8');
-            console.log({ data: data });
-            var parsed = JSON.parse(data);
+            var parsed = JSON.parse(receivedDataChunk);
             messageHandler(parsed, socketStore);
         }
         catch (error) {

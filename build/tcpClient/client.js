@@ -85,6 +85,7 @@ var Client = /** @class */ (function () {
         this.setState = function (inState) {
             _this.state = __assign(__assign({}, _this.state), inState);
         };
+        this.receiveData = function (chunk) { return console.log(chunk.toString("utf8")); };
         this.start = function () { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -105,15 +106,18 @@ var Client = /** @class */ (function () {
         this.inputReducer = function (input) { return switchExp_1.match.apply(void 0, __spreadArrays([{ input: input, state: _this.state }], Object.entries(_this.publicCommands)
             .map(function (_a) {
             var name = _a[0], command = _a[1];
-            return switchExp_1.when(function (_a) {
+            return (switchExp_1.when(function (_a) {
                 var input = _a.input;
                 return input === name;
-            }, function () { return command.action(); });
-        }), [switchExp_1.def(function (message) { return _this.writeToServer(_this.createTextMessage(message)) || console.log({ input: input }); })])); };
+            }, function () { return command.action(); }));
+        }), [switchExp_1.def(function (_a) {
+                var input = _a.input;
+                return _this.writeToServer(_this.createTextMessage(input));
+            })])); };
         this.writeToServer = function (msg) {
             var txt = JSON.stringify(msg);
             console.log({ txt: txt, msg: msg });
-            _this.socket.write(JSON.stringify(txt));
+            _this.socket.write(txt);
             return false;
         };
         this.createTextMessage = function (msg) { return ({
@@ -125,6 +129,7 @@ var Client = /** @class */ (function () {
             var command = _a[0], entry = _a[1];
             return command + "-" + entry;
         })); };
+        this.socket.on("data", function (chunk) { return _this.receiveData(chunk); });
     }
     ;
     return Client;

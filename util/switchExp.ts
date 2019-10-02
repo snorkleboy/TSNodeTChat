@@ -41,8 +41,8 @@ const testWhen = (when, value) => {
     if (conditionMet) {
         ret = getWhenValue(when, value);
     }
-
-    return { value: ret, conditionMet};
+    console.log({ conditionMet, when, value, w: when[0].toString(), ret})
+    return { value: ret, conditionMet,};
 }
 const getWhenValue = (when,topValue) => isFunction(when[1]) ?
     when[1](topValue) :
