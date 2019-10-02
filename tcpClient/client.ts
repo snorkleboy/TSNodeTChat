@@ -1,6 +1,6 @@
 import { match,when,def } from "../util/switchExp";
 import { ClientType } from "../util/clientType";
-import { IMessage, MessageTypes, ActionTypes } from "../messages/message";
+import { Message,DestinationTypes, PostTextMessageRequest } from "../messages/message";
 var net = require('net');
 const readline = require('readline');
 
@@ -17,7 +17,17 @@ type clientData = {
     name: string,
     clientType:ClientType
 }
-
+type publicCommand = {
+    name: string,
+    action: Function
+};
+type PublicCommands = {
+    [key: string]: publicCommand
+}
+const makeCommandWhens = (publicCommands: PublicCommands) => Object.entries(publicCommands)
+    .map(([name, command]) => (
+        when(({ input }) => input === name, () => command.action())
+    ))
 class Client{
     constructor(public socket) {
         this.publicCommands["/h"].action = () => console.log(
@@ -25,7 +35,7 @@ class Client{
         )
         this.socket.on("data",chunk=>this.receiveData(chunk))
     };
-    publicCommands = {
+    private publicCommands: PublicCommands = {
         "/h": { name: 'help',action:null },
         "/c": { name: 'channels',action:null },
         "/q": { name: "quit",action:()=>this.setState({quit:true})}
@@ -40,7 +50,7 @@ class Client{
     setState = (inState)=>{
         this.state = {...this.state,...inState}
     }
-    receiveData = (chunk)=>console.log(chunk.toString("utf8"))
+    receiveData = (chunk)=>console.log(`${chunk.toString("utf8")}\n`)
     start = async () => {
         while (!this.state.close) {
             await this.promptReducer();
@@ -49,27 +59,27 @@ class Client{
         this.socket.destroy();
     };
     promptReducer = () => match(this.state,
-        when(s => !s.name, () => prompt("please Enter Name").then(name=>this.setState({name}) )),
-        when(s => !s.channel, () => prompt("please Enter Desired Channel").then(channel=>this.setState({channel}) )),
+        when(s => !s.name, () => prompt("please Enter Name:\n:").then(name=>this.setState({name}) )),
+        when(s => !s.channel, () => prompt("please Enter Desired Channel:\n:").then(channel=>this.setState({channel}) )),
         def(()=>prompt(`${this.state.name} | ${this.state.channel} ||=>:`).then(i=>this.inputReducer(i)))
     )
     inputReducer = (input:string)=>match({input,state:this.state},
-        ...Object.entries(this.publicCommands)
-            .map(([name, command]) =>(
-                when(({input})=>input===name, () => command.action()) 
-            )),
+        ...makeCommandWhens(this.publicCommands),
         def(({ input }) => this.writeToServer(this.createTextMessage(input)))
     );
-    writeToServer = (msg: IMessage) => {
+    writeToServer = (msg: Message) => {
         const txt = JSON.stringify(msg);
         console.log({ txt, msg});
         this.socket.write(txt);
         return false;
     }
-    createTextMessage = (msg:string):IMessage=>({
-        payload: msg,
-        type:MessageTypes.textMessage,
-        action:ActionTypes.post,
+    createTextMessage = (msg: string): Message => new PostTextMessageRequest({
+        body:msg,
+        from:this.state.name,
+        destination:{
+            type:DestinationTypes.channel,
+            val:0
+        }
     })
 }
 

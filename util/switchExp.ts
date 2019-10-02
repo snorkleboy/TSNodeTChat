@@ -1,49 +1,61 @@
-const isFunction = (thing) => typeof thing === 'function'
-const defStr = "default";
 
+const defStr = "default";
 type When = [any,any];
+type Whens = Array<When>;
 export const when = (condition,value):When=>[condition,value]
 export const def = (_def):When => [defStr, _def];
-export const match = (thing: any, ...whens: Array<When>):any => {
-    const value = isFunction(thing) ?
-        thing() 
-    :
-        thing
-    ;
-    let ret = undefined;
+export const match = (testThing: any, ...whens:Whens ):any => {
+    const value = getFromFunctionOrValue(testThing);
+    let { whensValue,activated} = testWhens(whens,value);
+    if (!activated) {
+        whensValue = checkDefault(whens,value);
+    }
+    return whensValue;
+}
+const testWhens = (whens: Whens, value): { whensValue: any, activated: boolean } =>{
+    let whensValue = undefined;
     let activated = false;
     for (let i = 0; i < whens.length; i++) {
-        const { value:whenValue, conditionMet} = testWhen(whens[i], value);
+        const { value: whenValue, conditionMet } = testWhen(whens[i], value);
         if (conditionMet) {
-            ret = whenValue;
+            whensValue = whenValue;
             activated = true;
             break;
         }
     }
-    if (!activated){
-        let possibleDef = whens[whens.length - 1];
-        if (possibleDef[0] === defStr){
-            ret = getWhenValue(possibleDef, value);
+    return {whensValue,activated}
+}
+const testWhen = (when:When, value) => {
+    let ret = undefined;
+    let conditionMet = undefined;
+    if (when[0] === defStr){
+        conditionMet= false;
+    }else{
+        conditionMet = checkWhenCondition(when,value);
+        if (conditionMet) {
+            ret = getWhenValue(when,value);
         }
     }
-    return ret;
+    return { value: ret, conditionMet};
+}
+const checkDefault = (whens:Whens,value)=>{
+    let possibleDefWhen = whens[whens.length - 1];
+    if (possibleDefWhen[0] === defStr) {
+        return getWhenValue(possibleDefWhen, value);
+    }
+}
 
 
-}
-const testWhen = (when, value) => {
-    let ret = undefined;
-    if (when[0] === defStr){
-        return { conditionMet: false, ret}
-    }
-    let conditionMet = isFunction(when[0]) ?
-        when[0](value):
-        when[0] === value;
-    if (conditionMet) {
-        ret = getWhenValue(when, value);
-    }
-    console.log({ conditionMet, when, value, w: when[0].toString(), ret})
-    return { value: ret, conditionMet,};
-}
-const getWhenValue = (when,topValue) => isFunction(when[1]) ?
-    when[1](topValue) :
-    when[1];
+
+const checkWhenCondition = (when:When,value) => isFunction(when[0])?
+    when[0](value)
+    :
+    when[0] === value;
+const getWhenValue = (when:When,value)=>getFromFunctionOrValue(when[1],true,value);
+const getFromFunctionOrValue = (funcOrValue, shouldPassVal = false, invocationVal = undefined) => isFunction(funcOrValue) ?
+    (shouldPassVal ? funcOrValue(invocationVal) : funcOrValue())
+    :
+    funcOrValue
+    ;
+
+const isFunction = (thing) => typeof thing === 'function';
