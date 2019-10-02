@@ -2,7 +2,8 @@
 exports.__esModule = true;
 var ActionTypes;
 (function (ActionTypes) {
-})(ActionTypes || (ActionTypes = {}));
+    ActionTypes["post"] = "POST";
+})(ActionTypes = exports.ActionTypes || (exports.ActionTypes = {}));
 var MessageTypes;
 (function (MessageTypes) {
     MessageTypes["textMessage"] = "TEXT_MESSAGE";

@@ -2,8 +2,8 @@
 interface Idestination {
 
 }
-enum ActionTypes {
-
+export enum ActionTypes {
+    post = "POST"
 }
 interface IPayload {
 }
@@ -20,5 +20,4 @@ export interface IMessage {
     type: MessageTypes,
     action: ActionTypes
     payload: IPayload
-    originatingSocketID: Number
 }

@@ -23,7 +23,7 @@ export const match = (thing: any, ...whens: Array<When>):any => {
     if (!activated){
         let possibleDef = whens[whens.length - 1];
         if (possibleDef[0] === defStr){
-            ret = isFunction(possibleDef[1]) ? possibleDef[1]() : possibleDef[1];
+            ret = getWhenValue(possibleDef, value);
         }
     }
     return ret;
@@ -32,17 +32,18 @@ export const match = (thing: any, ...whens: Array<When>):any => {
 }
 const testWhen = (when, value) => {
     let ret = undefined;
-    if (when[0] !== defStr){
+    if (when[0] === defStr){
         return { conditionMet: false, ret}
     }
     let conditionMet = isFunction(when[0]) ?
-        when[0](value) :
+        when[0](value):
         when[0] === value;
     if (conditionMet) {
-        ret = getWhenValue(when);
+        ret = getWhenValue(when, value);
     }
+
     return { value: ret, conditionMet};
 }
-const getWhenValue = (when) => isFunction(when[1]) ?
-    when[1]() :
+const getWhenValue = (when,topValue) => isFunction(when[1]) ?
+    when[1](topValue) :
     when[1];

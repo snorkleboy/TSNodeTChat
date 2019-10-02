@@ -26,24 +26,24 @@ exports.match = function (thing) {
     if (!activated) {
         var possibleDef = whens[whens.length - 1];
         if (possibleDef[0] === defStr) {
-            ret = isFunction(possibleDef[1]) ? possibleDef[1]() : possibleDef[1];
+            ret = getWhenValue(possibleDef, value);
         }
     }
     return ret;
 };
 var testWhen = function (when, value) {
     var ret = undefined;
-    if (when[0] !== defStr) {
+    if (when[0] === defStr) {
         return { conditionMet: false, ret: ret };
     }
     var conditionMet = isFunction(when[0]) ?
         when[0](value) :
         when[0] === value;
     if (conditionMet) {
-        ret = getWhenValue(when);
+        ret = getWhenValue(when, value);
     }
     return { value: ret, conditionMet: conditionMet };
 };
-var getWhenValue = function (when) { return isFunction(when[1]) ?
-    when[1]() :
+var getWhenValue = function (when, topValue) { return isFunction(when[1]) ?
+    when[1](topValue) :
     when[1]; };
