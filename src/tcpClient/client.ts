@@ -1,19 +1,19 @@
 import { match,when,def } from "../util/switchExp";
 import { ClientType } from "../util/clientType";
-import { Message,DestinationTypes, PostTextMessageRequest } from "../messages/message";
+import { Message, ChannelPostRequest } from "../messages/message";
+import { DestinationTypes,TextMessagePostRequest } from "../messages/message";
+import { newLineArt } from "../util/newline";
 var net = require('net');
 const readline = require('readline');
-
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
-
 const prompt = (question:string)=>new Promise<string>(r=>{
     rl.question(question,answer=>r(answer))
 })
 type clientData = {
-    channel: string,
+    channel: {name:string,id:number},
     name: string,
     clientType:ClientType
 }
@@ -24,29 +24,42 @@ type publicCommand = {
 type PublicCommands = {
     [key: string]: publicCommand
 }
+const commandsMaker: (c: Client)=>PublicCommands = (ClientContext)=> ({
+    "/h": { name: 'help', action: null },//made at construction
+    "/c": {
+        name: 'channels', action: () => new Promise((res, rej) => prompt(`/c 'channelName'`)
+            .then(r => {
+                ClientContext.setState({ channel: {name:r,id:ClientContext.state.channel.id} });
+                ClientContext.writeToServer(ClientContext.makeCreateChannelCommand(r));
+                res();
+            })
+        )
+    },
+    "/q": { name: "quit", action: () => ClientContext.setState({ quit: true }) }
+})
 const makeCommandWhens = (publicCommands: PublicCommands) => Object.entries(publicCommands)
     .map(([name, command]) => (
         when(({ input }) => input === name, () => command.action())
     ))
+
+
 class Client{
+    private publicCommands: PublicCommands = commandsMaker(this);
+    private stdIn = process.openStdin();
+    public state: clientData & { close: boolean, auth: boolean } = {
+        channel: { name: "all",id:0},
+        name: null,
+        clientType: ClientType.tcpClient,
+        close: false,
+        auth: false
+    };  
     constructor(public socket) {
         this.publicCommands["/h"].action = () => console.log(
             Object.entries(this.publicCommands).map(([command, entry]) => `${command}-${entry}`)
         )
         this.socket.on("data",chunk=>this.receiveData(chunk))
     };
-    private publicCommands: PublicCommands = {
-        "/h": { name: 'help',action:null },
-        "/c": { name: 'channels',action:null },
-        "/q": { name: "quit",action:()=>this.setState({quit:true})}
-    }
-    private stdIn = process.openStdin();
-    private state: clientData & {close:boolean}= {
-        channel: null,
-        name: null,
-        clientType:ClientType.tcpClient,
-        close:false
-    };  
+
     setState = (inState)=>{
         this.state = {...this.state,...inState}
     }
@@ -54,31 +67,40 @@ class Client{
     start = async () => {
         while (!this.state.close) {
             await this.promptReducer();
+            console.log("finish await");
         }
         rl.close();
         this.socket.destroy();
     };
     promptReducer = () => match(this.state,
-        when(s => !s.name, () => prompt("please Enter Name:\n:").then(name=>this.setState({name}) )),
-        when(s => !s.channel, () => prompt("please Enter Desired Channel:\n:").then(channel=>this.setState({channel}) )),
-        def(()=>prompt(`${this.state.name} | ${this.state.channel} ||=>:`).then(i=>this.inputReducer(i)))
+        when(s => !s.name, () => prompt("please Enter Name:\n:")
+            .then(name=>{
+                this.setState({ name, auth: true })
+                this.socket.write(this.state.name)
+            })),
+        // when(s => !s.channel, (s) => prompt("please Enter Desired Channel:\n:").then(channel=>{})),
+        when(s => s.auth, () => prompt(newLineArt(this.state.name,this.state.channel.name))
+            .then(i=>this.inputReducer(i)))
     )
     inputReducer = (input:string)=>match({input,state:this.state},
         ...makeCommandWhens(this.publicCommands),
-        def(({ input }) => this.writeToServer(this.createTextMessage(input)))
+        def(({ input }) => this.writeToServer(this.makeTextMessage(input)))
     );
     writeToServer = (msg: Message) => {
         const txt = JSON.stringify(msg);
-        console.log({ txt, msg});
         this.socket.write(txt);
         return false;
     }
-    createTextMessage = (msg: string): Message => new PostTextMessageRequest({
+    makeJoinChannelCommand = (name, switchTo = true)=>{};
+    makeCreateChannelCommand = (name, switchTo = true): Message => new ChannelPostRequest({
+        channelName:name,
+        switchTo
+    })
+    makeTextMessage = (msg: string): Message => new TextMessagePostRequest({
         body:msg,
-        from:this.state.name,
         destination:{
             type:DestinationTypes.channel,
-            val:0
+            val:this.state.channel.name
         }
     })
 }

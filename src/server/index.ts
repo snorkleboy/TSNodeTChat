@@ -1,8 +1,8 @@
 import { TCPHTTPSwitchServer} from "./server";
-import { socketHandler as TCPSocketHandler} from "./sockets/socketHandler";
-import { Sockets as SocketStore } from "./sockets/sockets";
+import { socketHandler as TCPSocketHandler} from "./handlers/socketHandler";
+import { Store } from "./store/store";
 
-const tcpSockets = new SocketStore();
+const tcpSockets = Store.createStore();
 const { tcpServer, httpServer } = TCPHTTPSwitchServer(
     (socket) => TCPSocketHandler(socket, tcpSockets)
 );

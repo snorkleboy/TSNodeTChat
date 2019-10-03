@@ -57,6 +57,8 @@ exports.__esModule = true;
 var switchExp_1 = require("../util/switchExp");
 var clientType_1 = require("../util/clientType");
 var message_1 = require("../messages/message");
+var message_2 = require("../messages/message");
+var newline_1 = require("../util/newline");
 var net = require('net');
 var readline = require('readline');
 var rl = readline.createInterface({
@@ -66,26 +68,43 @@ var rl = readline.createInterface({
 var prompt = function (question) { return new Promise(function (r) {
     rl.question(question, function (answer) { return r(answer); });
 }); };
+var commandsMaker = function (ClientContext) { return ({
+    "/h": { name: 'help', action: null },
+    "/c": {
+        name: 'channels', action: function () { return new Promise(function (res, rej) { return prompt("/c 'channelName'")
+            .then(function (r) {
+            ClientContext.setState({ channel: { name: r, id: ClientContext.state.channel.id } });
+            ClientContext.writeToServer(ClientContext.makeCreateChannelCommand(r));
+            res();
+        }); }); }
+    },
+    "/q": { name: "quit", action: function () { return ClientContext.setState({ quit: true }); } }
+}); };
+var makeCommandWhens = function (publicCommands) { return Object.entries(publicCommands)
+    .map(function (_a) {
+    var name = _a[0], command = _a[1];
+    return (switchExp_1.when(function (_a) {
+        var input = _a.input;
+        return input === name;
+    }, function () { return command.action(); }));
+}); };
 var Client = /** @class */ (function () {
     function Client(socket) {
         var _this = this;
         this.socket = socket;
-        this.publicCommands = {
-            "/h": { name: 'help', action: null },
-            "/c": { name: 'channels', action: null },
-            "/q": { name: "quit", action: function () { return _this.setState({ quit: true }); } }
-        };
+        this.publicCommands = commandsMaker(this);
         this.stdIn = process.openStdin();
         this.state = {
-            channel: null,
+            channel: { name: "all", id: 0 },
             name: null,
             clientType: clientType_1.ClientType.tcpClient,
-            close: false
+            close: false,
+            auth: false
         };
         this.setState = function (inState) {
             _this.state = __assign(__assign({}, _this.state), inState);
         };
-        this.receiveData = function (chunk) { return console.log(chunk.toString("utf8")); };
+        this.receiveData = function (chunk) { return console.log(chunk.toString("utf8") + "\n"); };
         this.start = function () { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -94,6 +113,7 @@ var Client = /** @class */ (function () {
                         return [4 /*yield*/, this.promptReducer()];
                     case 1:
                         _a.sent();
+                        console.log("finish await");
                         return [3 /*break*/, 0];
                     case 2:
                         rl.close();
@@ -102,28 +122,39 @@ var Client = /** @class */ (function () {
                 }
             });
         }); };
-        this.promptReducer = function () { return switchExp_1.match(_this.state, switchExp_1.when(function (s) { return !s.name; }, function () { return prompt("please Enter Name").then(function (name) { return _this.setState({ name: name }); }); }), switchExp_1.when(function (s) { return !s.channel; }, function () { return prompt("please Enter Desired Channel").then(function (channel) { return _this.setState({ channel: channel }); }); }), switchExp_1.def(function () { return prompt(_this.state.name + " | " + _this.state.channel + " ||=>:").then(function (i) { return _this.inputReducer(i); }); })); };
-        this.inputReducer = function (input) { return switchExp_1.match.apply(void 0, __spreadArrays([{ input: input, state: _this.state }], Object.entries(_this.publicCommands)
-            .map(function (_a) {
-            var name = _a[0], command = _a[1];
-            return (switchExp_1.when(function (_a) {
+        this.promptReducer = function () { return switchExp_1.match(_this.state, switchExp_1.when(function (s) { return !s.name; }, function () { return prompt("please Enter Name:\n:")
+            .then(function (name) {
+            _this.setState({ name: name, auth: true });
+            _this.socket.write(_this.state.name);
+        }); }), 
+        // when(s => !s.channel, (s) => prompt("please Enter Desired Channel:\n:").then(channel=>{})),
+        switchExp_1.when(function (s) { return s.auth; }, function () { return prompt(newline_1.newLineArt(_this.state.name, _this.state.channel.name))
+            .then(function (i) { return _this.inputReducer(i); }); })); };
+        this.inputReducer = function (input) { return switchExp_1.match.apply(void 0, __spreadArrays([{ input: input, state: _this.state }], makeCommandWhens(_this.publicCommands), [switchExp_1.def(function (_a) {
                 var input = _a.input;
-                return input === name;
-            }, function () { return command.action(); }));
-        }), [switchExp_1.def(function (_a) {
-                var input = _a.input;
-                return _this.writeToServer(_this.createTextMessage(input));
+                return _this.writeToServer(_this.makeTextMessage(input));
             })])); };
         this.writeToServer = function (msg) {
             var txt = JSON.stringify(msg);
-            console.log({ txt: txt, msg: msg });
             _this.socket.write(txt);
             return false;
         };
-        this.createTextMessage = function (msg) { return ({
-            payload: msg,
-            type: message_1.MessageTypes.textMessage,
-            action: message_1.ActionTypes.post
+        this.makeJoinChannelCommand = function (name, switchTo) {
+            if (switchTo === void 0) { switchTo = true; }
+        };
+        this.makeCreateChannelCommand = function (name, switchTo) {
+            if (switchTo === void 0) { switchTo = true; }
+            return new message_1.ChannelPostRequest({
+                channelName: name,
+                switchTo: switchTo
+            });
+        };
+        this.makeTextMessage = function (msg) { return new message_2.TextMessagePostRequest({
+            body: msg,
+            destination: {
+                type: message_2.DestinationTypes.channel,
+                val: _this.state.channel.name
+            }
         }); };
         this.publicCommands["/h"].action = function () { return console.log(Object.entries(_this.publicCommands).map(function (_a) {
             var command = _a[0], entry = _a[1];

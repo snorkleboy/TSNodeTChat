@@ -1,10 +1,19 @@
 
 const defStr = "default";
-type When = [any,any];
-type Whens = Array<When>;
-export const when = (condition,value):When=>[condition,value]
-export const def = (_def):When => [defStr, _def];
-export const match = (testThing: any, ...whens:Whens ):any => {
+type funcThatTakes<T> = (value: T) => any;
+type funkThatReturns<T> = ()=>T
+
+type TOrFuncThatRetunsIt<MatchParam> = funkThatReturns<MatchParam> | MatchParam;
+type MatchCaseOrFuncThatRetunsIt<matchValue> = funcThatTakes<matchValue> | any;
+
+type When<matchValue> = [MatchCaseOrFuncThatRetunsIt<matchValue>, MatchCaseOrFuncThatRetunsIt<matchValue>];
+type Whens<matchValue> = Array<When<matchValue>>;
+
+export const when = <T>(condition,value):When<T> => [condition,value];
+export const  def = <T>(_def):When<T> =>[defStr, _def];
+
+
+export const match = <T>(testThing: TOrFuncThatRetunsIt<T>, ...whens:Whens<T> ):any => {
     const value = getFromFunctionOrValue(testThing);
     let { whensValue,activated} = testWhens(whens,value);
     if (!activated) {
@@ -12,7 +21,7 @@ export const match = (testThing: any, ...whens:Whens ):any => {
     }
     return whensValue;
 }
-const testWhens = (whens: Whens, value): { whensValue: any, activated: boolean } =>{
+const testWhens = <T>(whens: Whens<T>, value): { whensValue: any, activated: boolean } =>{
     let whensValue = undefined;
     let activated = false;
     for (let i = 0; i < whens.length; i++) {
@@ -25,7 +34,7 @@ const testWhens = (whens: Whens, value): { whensValue: any, activated: boolean }
     }
     return {whensValue,activated}
 }
-const testWhen = (when:When, value) => {
+const testWhen =<T> (when:When<T>, value) => {
     let ret = undefined;
     let conditionMet = undefined;
     if (when[0] === defStr){
@@ -38,7 +47,7 @@ const testWhen = (when:When, value) => {
     }
     return { value: ret, conditionMet};
 }
-const checkDefault = (whens:Whens,value)=>{
+const checkDefault = <T>(whens:Whens<T>,value)=>{
     let possibleDefWhen = whens[whens.length - 1];
     if (possibleDefWhen[0] === defStr) {
         return getWhenValue(possibleDefWhen, value);
@@ -47,11 +56,11 @@ const checkDefault = (whens:Whens,value)=>{
 
 
 
-const checkWhenCondition = (when:When,value) => isFunction(when[0])?
+const checkWhenCondition = <T>(when:When<T>,value) => isFunction(when[0])?
     when[0](value)
     :
     when[0] === value;
-const getWhenValue = (when:When,value)=>getFromFunctionOrValue(when[1],true,value);
+const getWhenValue = <T>(when:When<T>,value)=>getFromFunctionOrValue(when[1],true,value);
 const getFromFunctionOrValue = (funcOrValue, shouldPassVal = false, invocationVal = undefined) => isFunction(funcOrValue) ?
     (shouldPassVal ? funcOrValue(invocationVal) : funcOrValue())
     :

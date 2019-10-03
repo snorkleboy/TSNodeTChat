@@ -17,11 +17,11 @@ const isHttp = (str: string) => {
     }
 }
 export const peekIsHttp = (socket) => {
-    var buffer = Buffer.alloc(1000);
-    var ret = peek(socket._handle.fd, 1000, buffer);
+    var buffer = Buffer.alloc(100);
+    var peaked = peek(socket._handle.fd, 1000, buffer);
     let httpBool = false;
-    if (ret > 0) {
-        const msg = buffer.slice(0, ret).toString('utf8');
+    if (peaked > 0) {
+        const msg = buffer.slice(0, peaked).toString('utf8');
         httpBool = isHttp(msg);
     }
     return httpBool;
