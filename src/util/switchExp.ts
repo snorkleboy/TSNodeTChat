@@ -2,16 +2,16 @@
 const defStr = "default";
 type funcThatTakes<T> = (value: T) => any;
 type funkThatReturns<T> = ()=>T
+type NotFunction<T> = T extends Function ? never : T;
 
-type TOrFuncThatRetunsIt<MatchParam> = funkThatReturns<MatchParam> | MatchParam;
-type MatchCaseOrFuncThatRetunsIt<matchValue> = funcThatTakes<matchValue> | any;
+type TOrFuncThatRetunsIt<MatchParam> = funkThatReturns<MatchParam> | NotFunction<MatchParam>;
+type MatchCaseOrFuncThatRetunsIt<matchValue> = funcThatTakes<matchValue> | string|number|boolean|object
 
 type When<matchValue> = [MatchCaseOrFuncThatRetunsIt<matchValue>, MatchCaseOrFuncThatRetunsIt<matchValue>];
 type Whens<matchValue> = Array<When<matchValue>>;
 
 export const when = <T>(condition,value):When<T> => [condition,value];
 export const  def = <T>(_def):When<T> =>[defStr, _def];
-
 
 export const match = <T>(testThing: TOrFuncThatRetunsIt<T>, ...whens:Whens<T> ):any => {
     const value = getFromFunctionOrValue(testThing);
@@ -56,10 +56,13 @@ const checkDefault = <T>(whens:Whens<T>,value)=>{
 
 
 
-const checkWhenCondition = <T>(when:When<T>,value) => isFunction(when[0])?
-    when[0](value)
-    :
-    when[0] === value;
+const checkWhenCondition = <T>(when:When<T>,value) => {
+    if(isFunction(when[0])){
+        return when[0](value)
+    }else{
+        return when[0] === value;
+    }
+}
 const getWhenValue = <T>(when:When<T>,value)=>getFromFunctionOrValue(when[1],true,value);
 const getFromFunctionOrValue = (funcOrValue, shouldPassVal = false, invocationVal = undefined) => isFunction(funcOrValue) ?
     (shouldPassVal ? funcOrValue(invocationVal) : funcOrValue())
@@ -67,4 +70,4 @@ const getFromFunctionOrValue = (funcOrValue, shouldPassVal = false, invocationVa
     funcOrValue
     ;
 
-const isFunction = (thing) => typeof thing === 'function';
+const isFunction = (thing): thing is Function=> typeof thing === 'function';

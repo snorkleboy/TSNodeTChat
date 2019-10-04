@@ -48,10 +48,14 @@ var checkDefault = function (whens, value) {
         return getWhenValue(possibleDefWhen, value);
     }
 };
-var checkWhenCondition = function (when, value) { return isFunction(when[0]) ?
-    when[0](value)
-    :
-        when[0] === value; };
+var checkWhenCondition = function (when, value) {
+    if (isFunction(when[0])) {
+        return when[0](value);
+    }
+    else {
+        return when[0] === value;
+    }
+};
 var getWhenValue = function (when, value) { return getFromFunctionOrValue(when[1], true, value); };
 var getFromFunctionOrValue = function (funcOrValue, shouldPassVal, invocationVal) {
     if (shouldPassVal === void 0) { shouldPassVal = false; }

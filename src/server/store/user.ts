@@ -1,7 +1,8 @@
-import { SocketWrapper } from "./socket";
 import { Channel } from "./channel";
-import { IdedEntity, RecordStore, Store, ChannelStore } from "./store";
+import { SocketWrapper } from "./socket";
+import { ChannelStore, RecordStore, Store, IdedEntity } from "./store";
 let userId = 0;
+
 const getNewUserId = ()=>userId++;
 export class User implements IdedEntity {
     private constructor(public id: number, public username: string, socket: SocketWrapper){

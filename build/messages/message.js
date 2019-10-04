@@ -5,6 +5,7 @@ var ActionTypes;
     ActionTypes["post"] = "POST";
     ActionTypes["patch"] = "PATCH";
     ActionTypes["get"] = "GET";
+    ActionTypes["delete"] = "DELETE";
 })(ActionTypes = exports.ActionTypes || (exports.ActionTypes = {}));
 var MessageTypes;
 (function (MessageTypes) {
@@ -54,8 +55,3 @@ var ChannelGetRequest = /** @class */ (function () {
     return ChannelGetRequest;
 }());
 exports.ChannelGetRequest = ChannelGetRequest;
-// export class NewTextMessageResponse implements Message{
-//     type = MessageTypes.textMessage
-//     action = ActionTypes.post
-//     constructor(public payload: TextMessagePayload) { }
-// }

@@ -4,12 +4,10 @@ var http_1 = require("http");
 var peakIsHttp_1 = require("./util/peakIsHttp");
 var Net = require('net');
 var port = 3005;
-exports.TCPHTTPSwitchServer = function (tcpSocketHandler, options, httpRequestHandler) {
-    if (httpRequestHandler === void 0) { httpRequestHandler = (function (req, res) { return res.end("hello httpServer"); }); }
+exports.TCPHTTPSwitchServer = function (onConnectNonHTTPTCPSocket, httpRequestHandler, options) {
     console.log("server start");
     var tcpServer = new Net.Server();
-    var httpServer = http_1.createServer(options, httpRequestHandler);
-    tcpServer.listen(port, function () { return console.log("Server listening for connection requests on socket localhost:" + port); });
+    var httpServer = http_1.createServer(httpRequestHandler);
     tcpServer.on('connection', function (socket) {
         var httpBool = peakIsHttp_1.peekIsHttp(socket);
         console.log({ fd: socket._handle.fd, httpBool: httpBool });
@@ -17,8 +15,8 @@ exports.TCPHTTPSwitchServer = function (tcpSocketHandler, options, httpRequestHa
             httpServer.emit("connection", socket);
         }
         else {
-            tcpSocketHandler(socket);
+            onConnectNonHTTPTCPSocket(socket);
         }
     });
-    return { tcpServer: tcpServer, httpServer: httpServer };
+    return { tcpServer: tcpServer, httpServer: httpServer, listen: function (listenOptions, cb) { return tcpServer.listen(listenOptions, cb); } };
 };

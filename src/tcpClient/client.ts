@@ -1,6 +1,6 @@
 import { match,when,def } from "../util/switchExp";
 import { ClientType } from "../util/clientType";
-import { Message, ChannelPostRequest } from "../messages/message";
+import { Message, ChannelPostRequest, UserPostRequest } from "../messages/message";
 import { DestinationTypes,TextMessagePostRequest } from "../messages/message";
 import { newLineArt } from "../util/newline";
 var net = require('net');
@@ -42,11 +42,11 @@ const makeCommandWhens = (publicCommands: PublicCommands) => Object.entries(publ
         when(({ input }) => input === name, () => command.action())
     ))
 
-
+type ComponentState = clientData & { close: boolean, auth: boolean };
 class Client{
     private publicCommands: PublicCommands = commandsMaker(this);
     private stdIn = process.openStdin();
-    public state: clientData & { close: boolean, auth: boolean } = {
+    public state: ComponentState  = {
         channel: { name: "all",id:0},
         name: null,
         clientType: ClientType.tcpClient,
@@ -72,15 +72,19 @@ class Client{
         rl.close();
         this.socket.destroy();
     };
+        // [s => !s.channel, (s) => prompt("please Enter Desired Channel:\n:").then(channel=>{})],
     promptReducer = () => match(this.state,
-        when(s => !s.name, () => prompt("please Enter Name:\n:")
+        [s =>!s.auth,() => 
+            prompt("please Enter Name:\n:")
             .then(name=>{
                 this.setState({ name, auth: true })
-                this.socket.write(this.state.name)
-            })),
-        // when(s => !s.channel, (s) => prompt("please Enter Desired Channel:\n:").then(channel=>{})),
-        when(s => s.auth, () => prompt(newLineArt(this.state.name,this.state.channel.name))
-            .then(i=>this.inputReducer(i)))
+                this.writeToServer(this.makeLoginMessage());
+            })
+        ],
+        [s => s.auth,() => 
+            prompt(newLineArt(this.state.name,this.state.channel.name))
+            .then(i=>this.inputReducer(i))
+        ]
     )
     inputReducer = (input:string)=>match({input,state:this.state},
         ...makeCommandWhens(this.publicCommands),
@@ -89,14 +93,15 @@ class Client{
     writeToServer = (msg: Message) => {
         const txt = JSON.stringify(msg);
         this.socket.write(txt);
-        return false;
     }
-    makeJoinChannelCommand = (name, switchTo = true)=>{};
-    makeCreateChannelCommand = (name, switchTo = true): Message => new ChannelPostRequest({
+    makeLoginMessage = ()=> new UserPostRequest({
+        userName:this.state.name
+    })
+    makeCreateChannelCommand = (name, switchTo = true) => new ChannelPostRequest({
         channelName:name,
         switchTo
     })
-    makeTextMessage = (msg: string): Message => new TextMessagePostRequest({
+    makeTextMessage = (msg: string) => new TextMessagePostRequest({
         body:msg,
         destination:{
             type:DestinationTypes.channel,

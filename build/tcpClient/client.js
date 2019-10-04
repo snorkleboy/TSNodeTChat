@@ -122,14 +122,19 @@ var Client = /** @class */ (function () {
                 }
             });
         }); };
-        this.promptReducer = function () { return switchExp_1.match(_this.state, switchExp_1.when(function (s) { return !s.name; }, function () { return prompt("please Enter Name:\n:")
-            .then(function (name) {
-            _this.setState({ name: name, auth: true });
-            _this.socket.write(_this.state.name);
-        }); }), 
-        // when(s => !s.channel, (s) => prompt("please Enter Desired Channel:\n:").then(channel=>{})),
-        switchExp_1.when(function (s) { return s.auth; }, function () { return prompt(newline_1.newLineArt(_this.state.name, _this.state.channel.name))
-            .then(function (i) { return _this.inputReducer(i); }); })); };
+        // [s => !s.channel, (s) => prompt("please Enter Desired Channel:\n:").then(channel=>{})],
+        this.promptReducer = function () { return switchExp_1.match(_this.state, [function (s) { return !s.auth; }, function () {
+                return prompt("please Enter Name:\n:")
+                    .then(function (name) {
+                    _this.setState({ name: name, auth: true });
+                    _this.writeToServer(_this.makeLoginMessage());
+                });
+            }
+        ], [function (s) { return s.auth; }, function () {
+                return prompt(newline_1.newLineArt(_this.state.name, _this.state.channel.name))
+                    .then(function (i) { return _this.inputReducer(i); });
+            }
+        ]); };
         this.inputReducer = function (input) { return switchExp_1.match.apply(void 0, __spreadArrays([{ input: input, state: _this.state }], makeCommandWhens(_this.publicCommands), [switchExp_1.def(function (_a) {
                 var input = _a.input;
                 return _this.writeToServer(_this.makeTextMessage(input));
@@ -137,11 +142,10 @@ var Client = /** @class */ (function () {
         this.writeToServer = function (msg) {
             var txt = JSON.stringify(msg);
             _this.socket.write(txt);
-            return false;
         };
-        this.makeJoinChannelCommand = function (name, switchTo) {
-            if (switchTo === void 0) { switchTo = true; }
-        };
+        this.makeLoginMessage = function () { return new message_1.UserPostRequest({
+            userName: _this.state.name
+        }); };
         this.makeCreateChannelCommand = function (name, switchTo) {
             if (switchTo === void 0) { switchTo = true; }
             return new message_1.ChannelPostRequest({

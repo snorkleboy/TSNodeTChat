@@ -16,13 +16,15 @@ const isHttp = (str: string) => {
         return false;
     }
 }
-export const peekIsHttp = (socket) => {
+
+export const peekIsHttp = (socket): boolean => {
     var buffer = Buffer.alloc(100);
     var peaked = peek(socket._handle.fd, 1000, buffer);
     let httpBool = false;
+    let json = null;
     if (peaked > 0) {
         const msg = buffer.slice(0, peaked).toString('utf8');
         httpBool = isHttp(msg);
     }
-    return httpBool;
+    return httpBool
 }

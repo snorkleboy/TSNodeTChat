@@ -21,6 +21,7 @@ exports.peekIsHttp = function (socket) {
     var buffer = Buffer.alloc(100);
     var peaked = peek(socket._handle.fd, 1000, buffer);
     var httpBool = false;
+    var json = null;
     if (peaked > 0) {
         var msg = buffer.slice(0, peaked).toString('utf8');
         httpBool = isHttp(msg);

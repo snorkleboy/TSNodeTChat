@@ -1,4 +1,3 @@
-import { SocketWrapper } from "./socket";
 import { Channel } from "./channel";
 import { User } from "./user";
 export interface IdedEntity{
