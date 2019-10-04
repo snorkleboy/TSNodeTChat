@@ -33,6 +33,7 @@ const socketCofigurators :{ [key: string]: SocketConfigurer}= {
 
 
 const getNextMessage = (socket)=>new Promise<any>((r,e)=>socket.once("data",(chunk)=>r(chunk)))
+//at this point the socket is confired not HTTP, but it may be a fill json client or a 'barecleint' like telnet or netcat. 
 async function IdentityGetter(socket:SocketWrapper, store: Store):Promise<{user:User,isJson:Boolean}>{
     const endCB = () => {
         console.log('Closing connection with the client')
@@ -59,9 +60,13 @@ async function IdentityGetter(socket:SocketWrapper, store: Store):Promise<{user:
         //if initial message is not json then it is interpreted as name
         } catch (error) {
             userInfo = chunk.toString("utf8");
-            user = User.createUser(userInfo, socket);
-
-            isJson = false;
+            if(userInfo && userInfo.length > 0){
+                user = User.createUser(userInfo, socket);
+                isJson = false;
+            }else{
+                // try again
+            }
+      
         }
     }
     socket.socket.removeListener('end', endCB);
@@ -74,7 +79,6 @@ export const TCPClientSocketHandler = async (
 ) => {
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
     let{user,isJson} = await IdentityGetter(socketWrapper, store);
-    
     console.log("new user", { name:user.username, id:user.id, isJson});
     user.addChannel(Store.defaultChannel);
     socketCofigurators[isJson ? "jsonClient" :"bareClient"](user, socketWrapper, store)
