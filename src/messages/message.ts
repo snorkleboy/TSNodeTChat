@@ -4,7 +4,8 @@ import { Channel } from "../server/store/channel";
 export enum ActionTypes {
     post = "POST",
     patch = "PATCH",
-    get = "GET"
+    get = "GET",
+    delete = "DELETE"
 }
 export enum MessageTypes {
     textMessage = "TEXT_MESSAGE",
@@ -60,8 +61,4 @@ export type HandledMessages =
     | TextMessagePostRequest
     | ChannelPostRequest
     | ChannelGetRequest
-// export class NewTextMessageResponse implements Message{
-//     type = MessageTypes.textMessage
-//     action = ActionTypes.post
-//     constructor(public payload: TextMessagePayload) { }
-// }
+

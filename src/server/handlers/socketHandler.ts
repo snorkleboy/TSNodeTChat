@@ -3,7 +3,7 @@ import { messageHandler as messageHandlerDef, MessageHandler} from "./messageHan
 import { SocketWrapper } from "../store/socket";
 import { User } from "../store/user";
 import { MessageTypes, Message } from "../../messages/message";
-function socketConfigurer(user: User, socket: SocketWrapper, store: Store, messageHandler: MessageHandler<Message,void> ) {
+function socketConfigurer(user: User, socket: SocketWrapper, store: Store, messageHandler: MessageHandler<Message> ) {
     socket.socket.on('end', () => {
         console.log('Closing connection with the client');
         socket.socket.destroy();
@@ -26,7 +26,6 @@ function socketConfigurer(user: User, socket: SocketWrapper, store: Store, messa
 
 
 const getNextMessage = (socket)=>new Promise<any>((r,e)=>socket.once("data",(chunk)=>r(chunk)))
-
 function IdentityGetter(socket:SocketWrapper, store: Store):Promise<User>{
     const endCB = () => {
         console.log('Closing connection with the client')
@@ -58,7 +57,7 @@ function IdentityGetter(socket:SocketWrapper, store: Store):Promise<User>{
 export const socketHandler = async (
     socket,
     store: Store,
-    messageHandler: MessageHandler<Message,void> = messageHandlerDef
+    messageHandler: MessageHandler<Message> = messageHandlerDef
 ) => {
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
     let user = await IdentityGetter(socketWrapper, store);

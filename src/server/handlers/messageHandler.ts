@@ -1,29 +1,25 @@
 import { Store } from "../store/store";
-import { MessageTypes, HandledMessages,  ActionTypes, DestinationTypes } from "../../messages/message";
+import { MessageTypes, HandledMessages,  ActionTypes, DestinationTypes, Message } from "../../messages/message";
 import { User } from "../store/user";
 import { SocketWrapper } from "../store/socket";
 import { Channel } from "../store/channel";
 import { newLineArt } from "../../util/newline";
-
-export interface MessageHandler<M,T> { (message: M, store: Store, user: User, thisSocket: SocketWrapper): T };
-
-
-
-type TypesToMessageGeneric<U> = {
-    [actionType in HandledMessages["type"]]: U extends { type: actionType } ? U:never
+export type TypeMapper<T extends { type: string }> = {
+    [Type in T["type"]]: T extends { type: Type } ? T : never
 }
-type typeToMessage = TypesToMessageGeneric<HandledMessages>;
+export interface MessageHandler<M extends Message> { (message: M, store: Store, user: User, thisSocket: SocketWrapper): void };
 
-type MessageActionHandlerMapGeneric<Handled>={
-    [messageType in HandledMessages["type"]]: {
-        [actionType in typeToMessage[messageType]['action']]: Handled extends { action: actionType, type: messageType } ? 
-            MessageHandler<Handled,void> 
-        : 
+type MessageActionHandlerMap<M extends Message>={
+    [messageType in M["type"]]: {
+        [actionType in TypeMapper<M>[messageType]['action']]: M extends { action: actionType, type: messageType } ?
+            MessageHandler<M>
+        :
             never
     } 
 };
-type MessageActionHandlerMap = MessageActionHandlerMapGeneric<HandledMessages>;
-const MessageActionHandlerMap: MessageActionHandlerMap= {
+
+type MessageActionHandlerResolver = MessageActionHandlerMap<HandledMessages>;
+const messageActionHandlerResolver: MessageActionHandlerResolver= {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user, socket) => {
             const {destination,body} = message.payload;
@@ -59,7 +55,7 @@ const MessageActionHandlerMap: MessageActionHandlerMap= {
 export const messageHandler = (message: HandledMessages, store: Store, user: User, thisSocket: SocketWrapper) =>{
     console.log("reveived message",user.username,message)
     try {
-        return MessageActionHandlerMap[message.type][message.action](message, store, user, thisSocket);;
+        return messageActionHandlerResolver[message.type][message.action](message, store, user, thisSocket);;
     } catch (error) {
         console.error({ error, message})
     }

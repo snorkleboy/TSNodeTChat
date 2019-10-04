@@ -11,7 +11,6 @@ export const TCPHTTPSwitchServer = (
     console.log("server start");
     const tcpServer = new Net.Server();
     const httpServer = createHTTPServer(options, httpRequestHandler );
-    tcpServer.listen(port, () => console.log(`Server listening for connection requests on socket localhost:${port}`));
     tcpServer.on('connection', (socket) => {
         const httpBool = peekIsHttp(socket);
         console.log({ fd: socket._handle.fd, httpBool });
@@ -21,5 +20,6 @@ export const TCPHTTPSwitchServer = (
             tcpSocketHandler(socket);
         }
     });
+    tcpServer.listen(port, () => console.log(`Server listening for connection requests on socket localhost:${port}`));
     return {tcpServer,httpServer};
 }
