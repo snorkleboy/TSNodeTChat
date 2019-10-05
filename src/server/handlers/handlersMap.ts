@@ -1,15 +1,10 @@
-import { MessageTypes, HandledMessages, ActionTypes, DestinationTypes, Message } from "../../messages/message";
-import { Channel } from "../store/channel";
+import { MessageTypes, ActionTypes, DestinationTypes } from "../../messages/message";
+import { HandledRequests} from "../../messages/messageTypeExport"
+import { Channel } from "../store/channel/channel";
 import { newLineArt } from "../../util/newline";
-import { Store } from "../store/store";
-import { User } from "../store/user";
-import { SocketWrapper } from "../store/socket";
-import { MessageHandler, MessageHandlerGen } from "./messageHandler";
-export type TypeMapper<T extends { type: string }> = {
-    [Type in T["type"]]: T extends { type: Type } ? T : never
-}
-
-type MessageActionHandlerMap<M extends HandledMessages> = {
+import { MessageHandlerGen  } from "./messageHandler";
+import { TypeMapper} from "../../util/typeMapper";
+export type MessageActionHandlerMap<M extends HandledRequests> = {
     [messageType in M["type"]]: {
         [actionType in TypeMapper<M>[messageType]['action']]: M extends { action: actionType, type: messageType } ?
         MessageHandlerGen<M>
@@ -18,7 +13,8 @@ type MessageActionHandlerMap<M extends HandledMessages> = {
     }
 };
 
-type MessageActionHandlerResolver = MessageActionHandlerMap<HandledMessages>;
+
+type MessageActionHandlerResolver = MessageActionHandlerMap<HandledRequests>;
 export const messageActionHandlerResolver: MessageActionHandlerResolver = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
@@ -28,7 +24,9 @@ export const messageActionHandlerResolver: MessageActionHandlerResolver = {
             } else if (destination.type === DestinationTypes.channel) {
                 const channel = user.channels.getByName(destination.val);
                 if (channel) {
-                    channel.forEachUser(u => u.id !== user.id && u.writeToAllSockets(`${newLineArt(user.username, channel.name)}${body}`));
+                    channel.forEachUser(u => u.id !== user.id && u.writeToAllSockets(
+                        `${newLineArt(user.username, channel.name)}${body}`
+                    ));
                 } else {
                     console.error("requested message to channel the user is not in", { message, user });
                 }

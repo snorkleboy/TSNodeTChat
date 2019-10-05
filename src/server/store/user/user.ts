@@ -1,6 +1,6 @@
-import { Channel } from "./channel";
-import { SocketWrapper } from "./socket";
-import { ChannelStore, RecordStore, Store, IdedEntity } from "./store";
+import { ChannelStore, RecordStore, Store, IdedEntity } from "../store";
+import { Channel } from "../channel/channel";
+import { SocketWrapper } from "../sockets/socket";
 let userId = 0;
 
 const getNewUserId = ()=>userId++;

@@ -104,7 +104,9 @@ var Client = /** @class */ (function () {
         this.setState = function (inState) {
             _this.state = __assign(__assign({}, _this.state), inState);
         };
-        this.receiveData = function (chunk) { return console.log(chunk.toString("utf8") + "\n"); };
+        this.receiveData = function (chunk) {
+            console.log(chunk.toString("utf8") + "\n");
+        };
         this.start = function () { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {

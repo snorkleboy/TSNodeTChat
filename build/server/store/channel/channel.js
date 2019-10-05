@@ -1,6 +1,6 @@
 "use strict";
 exports.__esModule = true;
-var store_1 = require("./store");
+var store_1 = require("../store");
 var channelId = 0;
 var getNewChannelId = function () { return channelId++; };
 var Channel = /** @class */ (function () {

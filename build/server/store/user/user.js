@@ -1,6 +1,6 @@
 "use strict";
 exports.__esModule = true;
-var store_1 = require("./store");
+var store_1 = require("../store");
 var userId = 0;
 var getNewUserId = function () { return userId++; };
 var User = /** @class */ (function () {

@@ -1,9 +1,8 @@
 import {Store} from "../store/store"
-import { SocketWrapper } from "../store/socket";
-import { User } from "../store/user";
-import { MessageTypes, Message, HandledMessages } from "../../messages/message";
 import { messageHandler } from "./messageHandler";
-
+import { SocketWrapper } from "../store/sockets/socket";
+import { User } from "../store/user/user";
+import { MessageTypes } from "../../messages/message";
 type SocketConfigurer = (user: User, socket: SocketWrapper, store: Store) => any;
 const socketCofigurators :{ [key: string]: SocketConfigurer}= {
     "jsonClient": (user: User, socket: SocketWrapper, store: Store)=> {

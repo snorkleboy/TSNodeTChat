@@ -13,7 +13,7 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 exports.__esModule = true;
-var channel_1 = require("./channel");
+var channel_1 = require("./channel/channel");
 var RecordStore = /** @class */ (function () {
     function RecordStore(store) {
         var _this = this;

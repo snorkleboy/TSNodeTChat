@@ -2,7 +2,7 @@
 var _a, _b, _c;
 exports.__esModule = true;
 var message_1 = require("../../messages/message");
-var channel_1 = require("../store/channel");
+var channel_1 = require("../store/channel/channel");
 var newline_1 = require("../../util/newline");
 exports.messageActionHandlerResolver = (_a = {},
     _a[message_1.MessageTypes.textMessage] = (_b = {},

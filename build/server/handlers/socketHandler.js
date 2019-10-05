@@ -37,10 +37,10 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 exports.__esModule = true;
 var store_1 = require("../store/store");
-var socket_1 = require("../store/socket");
-var user_1 = require("../store/user");
-var message_1 = require("../../messages/message");
 var messageHandler_1 = require("./messageHandler");
+var socket_1 = require("../store/sockets/socket");
+var user_1 = require("../store/user/user");
+var message_1 = require("../../messages/message");
 var socketCofigurators = {
     "jsonClient": function (user, socket, store) {
         socket.socket.on('end', function () {
@@ -68,6 +68,7 @@ var socketCofigurators = {
     }
 };
 var getNextMessage = function (socket) { return new Promise(function (r, e) { return socket.once("data", function (chunk) { return r(chunk); }); }); };
+//at this point the socket is confired not HTTP, but it may be a fill json client or a 'barecleint' like telnet or netcat. 
 function IdentityGetter(socket, store) {
     return __awaiter(this, void 0, void 0, function () {
         var endCB, errorCB, user, isJson, userInfo, chunk, parsed;
@@ -105,8 +106,13 @@ function IdentityGetter(socket, store) {
                     }
                     catch (error) {
                         userInfo = chunk.toString("utf8");
-                        user = user_1.User.createUser(userInfo, socket);
-                        isJson = false;
+                        if (userInfo && userInfo.length > 0) {
+                            user = user_1.User.createUser(userInfo, socket);
+                            isJson = false;
+                        }
+                        else {
+                            // try again
+                        }
                     }
                     return [3 /*break*/, 1];
                 case 3:

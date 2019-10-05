@@ -1,6 +1,7 @@
 import { match,when,def } from "../util/switchExp";
 import { ClientType } from "../util/clientType";
-import { Message, ChannelPostRequest, UserPostRequest } from "../messages/message";
+import {  ChannelPostRequest, UserPostRequest, } from "../messages/message";
+import { HandledRequests} from "../messages/messageTypeExport";
 import { DestinationTypes,TextMessagePostRequest } from "../messages/message";
 import { newLineArt } from "../util/newline";
 var net = require('net');
@@ -63,7 +64,9 @@ class Client{
     setState = (inState)=>{
         this.state = {...this.state,...inState}
     }
-    receiveData = (chunk)=>console.log(`${chunk.toString("utf8")}\n`)
+    receiveData = (chunk)=>{
+        console.log(`${chunk.toString("utf8")}\n`)
+    }
     start = async () => {
         while (!this.state.close) {
             await this.promptReducer();
@@ -90,7 +93,7 @@ class Client{
         ...makeCommandWhens(this.publicCommands),
         def(({ input }) => this.writeToServer(this.makeTextMessage(input)))
     );
-    writeToServer = (msg: Message) => {
+    writeToServer = (msg: HandledRequests | UserPostRequest) => {
         const txt = JSON.stringify(msg);
         this.socket.write(txt);
     }

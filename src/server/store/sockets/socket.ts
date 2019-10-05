@@ -1,4 +1,4 @@
-import { IdedEntity } from "./store";
+import { IdedEntity } from "../store";
 let currId: number = 0;
 const getNewSocketId = () => currId++;
 export class SocketWrapper implements IdedEntity{

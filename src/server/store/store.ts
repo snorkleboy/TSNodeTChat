@@ -1,5 +1,5 @@
-import { Channel } from "./channel";
-import { User } from "./user";
+import { Channel } from "./channel/channel";
+import { User } from "./user/user";
 export interface IdedEntity{
     id:number;
 }

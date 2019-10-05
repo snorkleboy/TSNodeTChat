@@ -1,5 +1,5 @@
-import { User } from "./user"
-import { IdedEntity, RecordStore, Store } from "./store";
+import { User } from "../user/user"
+import { IdedEntity, RecordStore, Store } from "../store";
 let channelId = 0;
 const getNewChannelId = () => channelId++;
 export class Channel implements IdedEntity {
