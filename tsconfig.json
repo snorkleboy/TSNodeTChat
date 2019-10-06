@@ -2,6 +2,7 @@
     "compilerOptions": {
         "module": "commonjs",   
         "esModuleInterop": true,
-        "outDir": "./build"
+        "outDir": "./build",
+        "compilerOptions.moduleResolution": "none"
     }
 }
