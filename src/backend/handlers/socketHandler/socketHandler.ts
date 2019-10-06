@@ -1,10 +1,6 @@
-import {Store} from "../../store/store"
 import { messageHandler } from "../requestHandler";
-import { SocketWrapper } from "../../store/sockets/socket";
-import { User } from "../../store/user/user";
-import { MessageTypes, ActionTypes } from "../../../messages/message";
-import { UserPostResponse } from "../../../messages/messages";
 import { IdentityGetter } from "./identityGetter";
+import { User, SocketWrapper, Store } from "../../../lib/store";
 type SocketConfigurer = (user: User, socket: SocketWrapper, store: Store) => any;
 const socketCofigurators :{ [key: string]: SocketConfigurer}= {
     "jsonClient": (user: User, socket: SocketWrapper, store: Store)=> {

@@ -1,9 +1,8 @@
-import { match,when,def } from "../util/switchExp";
-import { ClientType } from "../util/clientType";
-import { newLineArt } from "../util/newline";
-import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest } from "../messages/messages";
+import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest } from "../../lib/messages/messages";
 import { StreamAwaiter } from "./streamAwaiter";
-import { DestinationTypes } from "../messages/message";
+import {match,when, def} from "../../lib/util/switchExp"
+import { newLineArt} from "../../lib/util/newline"
+import { DestinationTypes } from "../../lib/messages/message";
 var net = require('net');
 const readline = require('readline');
 const rl = readline.createInterface({
@@ -16,7 +15,6 @@ const prompt = (question:string)=>new Promise<string>(r=>{
 type clientData = {
     channel: {name:string,id:number},
     name: string,
-    clientType:ClientType
 }
 type publicCommand = {
     name: string,
@@ -52,7 +50,6 @@ class Client{
     public state: ComponentState  = {
         channel: null,
         name: null,
-        clientType: ClientType.tcpClient,
         close: false,
         auth: false,
         msgs:[]

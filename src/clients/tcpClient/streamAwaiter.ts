@@ -1,4 +1,4 @@
-import { HandledResponses, UserPostResponse } from "../messages/messages";
+import { HandledResponses, UserPostResponse } from "../../lib/messages/messages";
 
 type StreamChecker<res> = (r: res) => boolean
 let i = 0;

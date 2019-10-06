@@ -1,7 +1,6 @@
-import { RequestToResponseConverterMap, HandledRequests, HandledResponses, ResponseMapper } from "../../messages/messageTypeExport";
-import { MessageTypes, ActionTypes, TextMessagePostResponse, ChannelPostResponse } from "../../messages/message";
-import { User } from "../store/user/user";
-import { TypeMapper } from "../../util/typeMapper";
+import { RequestToResponseConverterMap, ResponseMapper } from "../../lib/messages/messageTypeExport";
+import { MessageTypes, ActionTypes } from "../../lib/messages/message";
+import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
 
 export const responseMap: RequestToResponseConverterMap = {
     [MessageTypes.textMessage]:{

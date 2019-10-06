@@ -1,8 +1,13 @@
-import { TypeMapper } from "../util/typeMapper";
-import { MessageHandlerGen } from "../server/handlers/requestHandler";
-import { User } from "../server/store/user/user";
+
 import {HandledRequests,HandledResponses} from "./messages";
 import {MessageLike} from "./message";
+import { User, Store } from "../store";
+import { TypeMapper } from "../util/typeMapper";
+
+export type MessageHandlerGen<M extends HandledRequests> = (message: M, store: Store, user: User) => void;
+export type MessageHandler = MessageHandlerGen<HandledRequests>
+
+
 type RequestTypeActionHandlerMapType<M extends HandledRequests> = {
     [messageType in M["type"]]: {
         [actionType in TypeMapper<M>[messageType]['action']]: M extends { action: actionType, type: messageType } ?

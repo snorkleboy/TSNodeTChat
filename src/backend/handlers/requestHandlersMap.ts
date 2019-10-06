@@ -1,7 +1,7 @@
-import { MessageTypes, ActionTypes, DestinationTypes } from "../../messages/message";
-import { TextMessagePostResponse, ChannelPostResponse} from "../../messages/messages";
-import { RequestTypeActionResolver} from "../../messages/messageTypeExport";
-import { Channel } from "../store/channel/channel";
+import { RequestTypeActionResolver} from "../../lib/messages/messageTypeExport";
+import { MessageTypes, ActionTypes, DestinationTypes } from "../../lib/messages/message";
+import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
+import { Channel } from "../../lib/store";
 export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
@@ -38,5 +38,3 @@ export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
     },
 
 }
-
-const test = (a:string)=>a;

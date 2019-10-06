@@ -1,9 +1,7 @@
-import { Store } from "../store/store";
-import { User } from "../store/user/user";
-import { HandledRequests} from "../../messages/messages";
 import { requestTypeActionHandlerMap } from "./requestHandlersMap";
-export type MessageHandlerGen<M extends HandledRequests> = (message: M, store: Store, user: User)=> void ;
-export type MessageHandler = MessageHandlerGen<HandledRequests>
+import { MessageHandler } from "../../lib/messages/messageTypeExport";
+import { HandledRequests } from "../../lib/messages/messages";
+import { Store, User } from "../../lib/store";
 
 
 export const messageHandler: MessageHandler= (message: HandledRequests, store: Store, user: User) =>{
