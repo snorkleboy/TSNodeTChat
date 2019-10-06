@@ -1,4 +1,9 @@
 import { ChannelStore, UserStore } from "./recordStore";
+export { SocketWrapper } from "./sockets/socket";
+export { User } from "./user/user";
+export { Channel } from "./channel/channel";
+
+
 export class Store { private constructor(){};
     public static getStore = () => {
         if (!Store.Store){

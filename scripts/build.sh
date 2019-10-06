@@ -4,4 +4,4 @@ echo "clearing build folder";
 rm -Rf ./build
 
 echo "building";
-npx tsc --p ./
+npx tsc ./src/index.ts --outDir ./build --module amd

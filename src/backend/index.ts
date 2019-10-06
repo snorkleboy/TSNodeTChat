@@ -1,9 +1,8 @@
 import { TCPHTTPSwitchServer} from "./tcp/server";
-import { Store } from "../lib/store/store";
+import { Store, User } from "../lib/store/store";
 import { TCPClientSocketHandler} from "./handlers/socketHandler/socketHandler";
 import { TextMessagePostRequest, TextMessagePostResponse } from "../lib/messages/messages";
 import { DestinationTypes } from "../lib/messages/message";
-import { User } from "../lib/store";
 const options = {
     port: 3005
 };

@@ -1,6 +1,6 @@
-import { SocketWrapper, Store, User } from "../../../lib/store";
 import { MessageTypes, ActionTypes } from "../../../lib/messages/message";
 import { UserPostResponse } from "../../../lib/messages/messages";
+import { SocketWrapper, Store, User } from "../../../lib/store/store";
 
 
 const getNextMessage = (socket) => new Promise < any > ((r, e) => {

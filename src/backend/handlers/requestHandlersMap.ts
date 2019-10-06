@@ -1,7 +1,7 @@
 import { RequestTypeActionResolver} from "../../lib/messages/messageTypeExport";
 import { MessageTypes, ActionTypes, DestinationTypes } from "../../lib/messages/message";
 import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
-import { Channel } from "../../lib/store";
+import { Channel } from "../../lib/store/store";
 export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
@@ -30,7 +30,6 @@ export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
             const channel = Channel.getOrCreateChannel(channelName);
             channel.addUser(user);
             channel.forEachUser(u => u.writeToAllSockets(JSON.stringify(new ChannelPostResponse(message,user))))
-
         },
         [ActionTypes.get]: (message, store, user) => {
             user.writeToAllSockets(JSON.stringify(store.channels.store))

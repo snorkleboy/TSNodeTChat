@@ -1,5 +1,5 @@
 import { Request, Response,ActionTypes,DestinationTypes,MessageTypes} from "./message"
-import { User } from "../store";
+import { User } from "../store/store";
 export type HandledRequests =
     | TextMessagePostRequest
     | ChannelPostRequest
