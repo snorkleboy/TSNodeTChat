@@ -1,3 +1,3 @@
 #!/bin/bash
 echo "starting server"
-node ./build/server/index.js
+node ./build/backend/index.js

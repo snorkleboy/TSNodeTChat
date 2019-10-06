@@ -1,6 +1,7 @@
 import { messageHandler } from "../requestHandler";
 import { IdentityGetter } from "./identityGetter";
-import { User, SocketWrapper, Store } from "../../../lib/store/store";
+import { SocketWrapper, Store } from "../../../lib/store/store";
+import { User } from "../../../lib/store/user/user";
 type SocketConfigurer = (user: User, socket: SocketWrapper, store: Store) => any;
 const socketCofigurators :{ [key: string]: SocketConfigurer}= {
     "jsonClient": (user: User, socket: SocketWrapper, store: Store)=> {
@@ -36,7 +37,7 @@ export const TCPClientSocketHandler = async (
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
     let{user,isJson} = await IdentityGetter(socketWrapper, store);
     if(user){
-        console.log("new user", { name: user.username, id: user.id, isJson });
+        console.log("new user", { name: user.username, id: user.id, isJson, handle:socket._handle.fd });
         socketCofigurators[isJson ? "jsonClient" : "bareClient"](user, socketWrapper, store)
     }else{
         console.error("bailed out of identity getter");

@@ -1,7 +1,7 @@
 const path = require('path');
 
 module.exports = {
-    mode: "production",
+    mode: "development",
     entry: path.join(__dirname, "./src/clients/webReact/index.tsx"),
     // Enable sourcemaps for debugging webpack's output.
     devtool: "source-map",

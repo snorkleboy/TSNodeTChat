@@ -1,14 +1,12 @@
 import { MessageTypes, ActionTypes } from "../../../lib/messages/message";
 import { UserPostResponse } from "../../../lib/messages/messages";
-import { SocketWrapper, Store, User } from "../../../lib/store/store";
+import { SocketWrapper, Store } from "../../../lib/store/store";
+import { User } from "../../../lib/store/user/user";
 
-
-const getNextMessage = (socket) => new Promise < any > ((r, e) => {
-    socket.once("data", (chunk) => r(chunk))
-    socket.once('end', e);
-    socket.once('error', e);
-})
-//at this point the socket is confired not HTTP, but it may be a full json client or a 'barecleint' like telnet or netcat. 
+import { getNextMessage} from "../../util/getNextMessage"
+//at this point the socket is 'confired' not HTTP, but it may be a full json client or a 'barecleint' like telnet or netcat.
+//if an http message took longer than 500ms than it may be routed here
+// if it takes longer than 10000ms for any message to come through this will bail out
 export async function IdentityGetter(socket: SocketWrapper, store: Store): Promise < {
     user: User,
     isJson: Boolean
@@ -26,7 +24,7 @@ export async function IdentityGetter(socket: SocketWrapper, store: Store): Promi
     let isJson;
     console.log("IdentityGetter try");
     while (!user && !err) {
-        const chunk = await getNextMessage(socket.socket)
+        const chunk = await getNextMessage(socket.socket,10000)
             .catch(e => {
                 err = true;
                 console.error("error getting identity message", e)

@@ -1,30 +1,31 @@
 import { createServer as createHTTPServer} from 'http';
-import { peekIsHttp } from "../../lib/util/peakIsHttp";
-var socketIOFactory = require('socket.io');
-const Net = require('net');
+import { peekIsHttp } from "../util/peakIsHttp";
+import IO from "socket.io";
+import {Server, Socket} from "net"
 const port = 3005;
 export const TCPHTTPSwitchServer = (
     onConnectNonHTTPTCPSocket,
     httpRequestHandler,
     websocketHandler,
-    options
+    options={}
 ) => {
     console.log("server start");
-    const tcpServer = new Net.Server();
+    const tcpServer = new Server();
     const httpServer = createHTTPServer(httpRequestHandler);
-    const WebsocketServer = socketIOFactory(httpServer);
-    WebsocketServer.on("connection",websocketHandler);
+    const WebsocketServer = IO(httpServer);
+    WebsocketServer.sockets.on("connection", websocketHandler);
 
-    //if tcp socket recieves http message it is put into the http server which will trigger the httpRequestHandler, otherwise it goes to the TCPSocket Handler
-    tcpServer.on('connection', (socket) => {
-        const httpBool = peekIsHttp(socket);
-        console.log({ fd: socket._handle.fd, httpBool });
-        if (httpBool) {
-            httpServer.emit("connection", socket);
-        } else {
-            onConnectNonHTTPTCPSocket(socket);
-        }
-    });
+    tcpServer.on('connection', (socket: Socket & { ['_handle']: any}) => peekIsHttp(socket).then(({httpBool,msg})=>{
+        console.log("TCP connection",{ fd: socket._handle.fd, httpBool });
+            if (httpBool) {
+                httpServer.emit("connection", socket);
+                socket.emit("data", msg);
+            } else {
+                onConnectNonHTTPTCPSocket(socket);
+                socket.emit("data",msg);
+            }
+        })
+    );
     tcpServer.on("error", (e) => console.error("tcp server", { e }));
     return { tcpServer, httpServer, websocketHandler, listen: (listenOptions, cb) => tcpServer.listen(listenOptions, cb)};
 }

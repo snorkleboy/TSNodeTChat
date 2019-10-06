@@ -2,8 +2,8 @@
 import {HandledRequests,HandledResponses} from "./messages";
 import {MessageLike} from "./message";
 import { TypeMapper } from "../util/typeMapper";
-import { User, Store } from "../store/store";
-
+import {  Store } from "../store/store";
+import { User } from "../store/user/user";
 export type MessageHandlerGen<M extends HandledRequests> = (message: M, store: Store, user: User) => void;
 export type MessageHandler = MessageHandlerGen<HandledRequests>
 

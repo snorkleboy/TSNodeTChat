@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "br": "npx webpack",
-    "bbe": "bash ./scripts/build.sh"
+    "bbe": "bash ./scripts/build.sh",
+    "buildRun": "bash ./scripts/highLevel/buildAndRun",
+    "beRun":"bash ./scripts/runServer.sh"
   },
   "author": "",
   "license": "ISC",

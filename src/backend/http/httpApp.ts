@@ -18,7 +18,7 @@ function httpApp(req, res) {
 
     // by limiting the path to current directory only
     const sanitizePath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
-    let pathname = path.join(__dirname, sanitizePath);
+    let pathname = path.join(process.cwd()+"/public", sanitizePath);
 
     fs.exists(pathname, function (exist) {
         if (!exist) {

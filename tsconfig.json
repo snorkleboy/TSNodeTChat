@@ -1,8 +1,13 @@
 {
     "compilerOptions": {
-        "module": "commonjs",   
+        "module": "commonjs",
         "esModuleInterop": true,
-        "outDir": "./build",
-        "compilerOptions.moduleResolution": "none"
-    }
+        "outDir": "./build"
+        // "compilerOptions.moduleResolution": "none",
+
+    },
+    "exclude": [
+        "**/*.jsx",
+        "**/*.tsx"
+    ]
 }

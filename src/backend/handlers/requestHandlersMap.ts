@@ -1,7 +1,7 @@
 import { RequestTypeActionResolver} from "../../lib/messages/messageTypeExport";
 import { MessageTypes, ActionTypes, DestinationTypes } from "../../lib/messages/message";
 import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
-import { Channel } from "../../lib/store/store";
+import { Channel } from "../../lib/store/channel/channel";
 export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
