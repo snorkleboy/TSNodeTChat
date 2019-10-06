@@ -1,5 +1,6 @@
 import { User } from "../user/user"
-import { IdedEntity, RecordStore, Store } from "../store";
+import { IdedEntity, RecordStore } from "../recordStore";
+import { Store } from "../store";
 let channelId = 0;
 const getNewChannelId = () => channelId++;
 export class Channel implements IdedEntity {
@@ -23,11 +24,11 @@ export class Channel implements IdedEntity {
         let channel = Channel.getChannelByName(name);
         if(!channel){
             channel = Channel.addChannel(Channel.createChannel(name))
-        }else{
-            console.log("got existing channel", { channel });
         }
         return channel;
     }
     static forEachUser = () => Store.getStore().channels.forEach;
 
 }
+
+Store.defaultChannel = Channel.getOrCreateChannel("all");

@@ -1,9 +1,9 @@
 import { match,when,def } from "../util/switchExp";
 import { ClientType } from "../util/clientType";
-import {  ChannelPostRequest, UserPostRequest, } from "../messages/message";
-import { HandledRequests} from "../messages/messageTypeExport";
-import { DestinationTypes,TextMessagePostRequest } from "../messages/message";
 import { newLineArt } from "../util/newline";
+import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest } from "../messages/messages";
+import { StreamAwaiter } from "./streamAwaiter";
+import { DestinationTypes } from "../messages/message";
 var net = require('net');
 const readline = require('readline');
 const rl = readline.createInterface({
@@ -43,29 +43,35 @@ const makeCommandWhens = (publicCommands: PublicCommands) => Object.entries(publ
         when(({ input }) => input === name, () => command.action())
     ))
 
-type ComponentState = clientData & { close: boolean, auth: boolean };
+
+type ComponentState = clientData & { close: boolean, auth: boolean,msgs:Array<any> };
 class Client{
+    protected streamAwaiter = StreamAwaiter();
     private publicCommands: PublicCommands = commandsMaker(this);
     private stdIn = process.openStdin();
     public state: ComponentState  = {
-        channel: { name: "all",id:0},
+        channel: null,
         name: null,
         clientType: ClientType.tcpClient,
         close: false,
-        auth: false
+        auth: false,
+        msgs:[]
     };  
     constructor(public socket) {
         this.publicCommands["/h"].action = () => console.log(
             Object.entries(this.publicCommands).map(([command, entry]) => `${command}-${entry}`)
         )
-        this.socket.on("data",chunk=>this.receiveData(chunk))
+        this.socket.on("data",chunk=>this.receiveData(chunk));
     };
 
     setState = (inState)=>{
         this.state = {...this.state,...inState}
     }
     receiveData = (chunk)=>{
-        console.log(`${chunk.toString("utf8")}\n`)
+        console.clear();
+        this.streamAwaiter.onData(chunk);
+        this.state.msgs.push(`${chunk.toString("utf8")}\n`);
+        this.state.msgs.forEach(m=>console.log(m));
     }
     start = async () => {
         while (!this.state.close) {
@@ -80,8 +86,20 @@ class Client{
         [s =>!s.auth,() => 
             prompt("please Enter Name:\n:")
             .then(name=>{
-                this.setState({ name, auth: true })
-                this.writeToServer(this.makeLoginMessage());
+                const req = this.makeLoginMessage(name);
+                let prom = this.streamAwaiter.waitFor<UserPostResponse>(m => {
+                    if(m.isResponse && m.payload && m.payload.userName === name){
+                        console.log("awaited response", { m });
+                        return true;
+                    }else{
+                        return false
+                    }
+                });
+                this.writeToServer(req);
+                return prom;
+            }).then(m => {
+                console.log({m});
+                this.setState({ name:m.payload.userName,channel:m.payload.channels[0], auth: true });
             })
         ],
         [s => s.auth,() => 
@@ -97,8 +115,8 @@ class Client{
         const txt = JSON.stringify(msg);
         this.socket.write(txt);
     }
-    makeLoginMessage = ()=> new UserPostRequest({
-        userName:this.state.name
+    makeLoginMessage = (name)=> new UserPostRequest({
+        userName: name
     })
     makeCreateChannelCommand = (name, switchTo = true) => new ChannelPostRequest({
         channelName:name,

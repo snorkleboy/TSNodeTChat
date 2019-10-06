@@ -1,6 +1,7 @@
-import { ChannelStore, RecordStore, Store, IdedEntity } from "../store";
+import { ChannelStore, RecordStore, IdedEntity } from "../recordStore"
 import { Channel } from "../channel/channel";
 import { SocketWrapper } from "../sockets/socket";
+import { Store } from "../store";
 let userId = 0;
 
 const getNewUserId = ()=>userId++;
@@ -17,6 +18,7 @@ export class User implements IdedEntity {
     addChannel = (channel:Channel)=>{
         this.channels.add(channel);
         channel.users.add(this);
+        return this;
     }
 
     static getUser = (id: number): User => Store.getStore().users.get(id);

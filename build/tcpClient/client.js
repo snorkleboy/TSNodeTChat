@@ -56,9 +56,10 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
 exports.__esModule = true;
 var switchExp_1 = require("../util/switchExp");
 var clientType_1 = require("../util/clientType");
-var message_1 = require("../messages/message");
-var message_2 = require("../messages/message");
 var newline_1 = require("../util/newline");
+var messages_1 = require("../messages/messages");
+var streamAwaiter_1 = require("./streamAwaiter");
+var message_1 = require("../messages/message");
 var net = require('net');
 var readline = require('readline');
 var rl = readline.createInterface({
@@ -92,20 +93,25 @@ var Client = /** @class */ (function () {
     function Client(socket) {
         var _this = this;
         this.socket = socket;
+        this.streamAwaiter = streamAwaiter_1.StreamAwaiter();
         this.publicCommands = commandsMaker(this);
         this.stdIn = process.openStdin();
         this.state = {
-            channel: { name: "all", id: 0 },
+            channel: null,
             name: null,
             clientType: clientType_1.ClientType.tcpClient,
             close: false,
-            auth: false
+            auth: false,
+            msgs: []
         };
         this.setState = function (inState) {
             _this.state = __assign(__assign({}, _this.state), inState);
         };
         this.receiveData = function (chunk) {
-            console.log(chunk.toString("utf8") + "\n");
+            console.clear();
+            _this.streamAwaiter.onData(chunk);
+            _this.state.msgs.push(chunk.toString("utf8") + "\n");
+            _this.state.msgs.forEach(function (m) { return console.log(m); });
         };
         this.start = function () { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_a) {
@@ -128,8 +134,21 @@ var Client = /** @class */ (function () {
         this.promptReducer = function () { return switchExp_1.match(_this.state, [function (s) { return !s.auth; }, function () {
                 return prompt("please Enter Name:\n:")
                     .then(function (name) {
-                    _this.setState({ name: name, auth: true });
-                    _this.writeToServer(_this.makeLoginMessage());
+                    var req = _this.makeLoginMessage(name);
+                    var prom = _this.streamAwaiter.waitFor(function (m) {
+                        if (m.isResponse && m.payload && m.payload.userName === name) {
+                            console.log("awaited response", { m: m });
+                            return true;
+                        }
+                        else {
+                            return false;
+                        }
+                    });
+                    _this.writeToServer(req);
+                    return prom;
+                }).then(function (m) {
+                    console.log({ m: m });
+                    _this.setState({ name: m.payload.userName, channel: m.payload.channels[0], auth: true });
                 });
             }
         ], [function (s) { return s.auth; }, function () {
@@ -145,20 +164,20 @@ var Client = /** @class */ (function () {
             var txt = JSON.stringify(msg);
             _this.socket.write(txt);
         };
-        this.makeLoginMessage = function () { return new message_1.UserPostRequest({
-            userName: _this.state.name
+        this.makeLoginMessage = function (name) { return new messages_1.UserPostRequest({
+            userName: name
         }); };
         this.makeCreateChannelCommand = function (name, switchTo) {
             if (switchTo === void 0) { switchTo = true; }
-            return new message_1.ChannelPostRequest({
+            return new messages_1.ChannelPostRequest({
                 channelName: name,
                 switchTo: switchTo
             });
         };
-        this.makeTextMessage = function (msg) { return new message_2.TextMessagePostRequest({
+        this.makeTextMessage = function (msg) { return new messages_1.TextMessagePostRequest({
             body: msg,
             destination: {
-                type: message_2.DestinationTypes.channel,
+                type: message_1.DestinationTypes.channel,
                 val: _this.state.channel.name
             }
         }); };

@@ -2,9 +2,9 @@
 var _a, _b, _c;
 exports.__esModule = true;
 var message_1 = require("../../messages/message");
+var messages_1 = require("../../messages/messages");
 var channel_1 = require("../store/channel/channel");
-var newline_1 = require("../../util/newline");
-exports.messageActionHandlerResolver = (_a = {},
+exports.requestTypeActionHandlerMap = (_a = {},
     _a[message_1.MessageTypes.textMessage] = (_b = {},
         _b[message_1.ActionTypes.post] = function (message, store, user) {
             var _a = message.payload, destination = _a.destination, body = _a.body;
@@ -12,13 +12,14 @@ exports.messageActionHandlerResolver = (_a = {},
                 console.error("not implimented", { message: message });
             }
             else if (destination.type === message_1.DestinationTypes.channel) {
-                var channel_2 = user.channels.getByName(destination.val);
-                if (channel_2) {
-                    channel_2.forEachUser(function (u) { return u.id !== user.id && u.writeToAllSockets("" + newline_1.newLineArt(user.username, channel_2.name) + body); });
+                var channel = user.channels.getByName(destination.val);
+                if (channel) {
+                    channel.forEachUser(function (u) { return u.writeToAllSockets(JSON.stringify(new messages_1.TextMessagePostResponse(message, user))); });
                 }
                 else {
                     console.error("requested message to channel the user is not in", { message: message, user: user });
                 }
+                ;
             }
         },
         _b),
@@ -31,10 +32,11 @@ exports.messageActionHandlerResolver = (_a = {},
             }
             var channel = channel_1.Channel.getOrCreateChannel(channelName);
             channel.addUser(user);
-            channel.forEachUser(function (u) { return u.writeToAllSockets("new user " + user.username); });
+            channel.forEachUser(function (u) { return u.writeToAllSockets(JSON.stringify(new messages_1.ChannelPostResponse(message, user))); });
         },
         _c[message_1.ActionTypes.get] = function (message, store, user) {
             user.writeToAllSockets(JSON.stringify(store.channels.store));
         },
         _c),
     _a);
+var test = function (a) { return a; };

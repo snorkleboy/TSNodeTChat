@@ -36,11 +36,9 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 exports.__esModule = true;
-var store_1 = require("../store/store");
-var messageHandler_1 = require("./messageHandler");
-var socket_1 = require("../store/sockets/socket");
-var user_1 = require("../store/user/user");
-var message_1 = require("../../messages/message");
+var requestHandler_1 = require("../requestHandler");
+var socket_1 = require("../../store/sockets/socket");
+var identityGetter_1 = require("./identityGetter");
 var socketCofigurators = {
     "jsonClient": function (user, socket, store) {
         socket.socket.on('end', function () {
@@ -56,7 +54,7 @@ var socketCofigurators = {
         socket.socket.on('data', function (receivedDataChunk) {
             try {
                 var parsed = JSON.parse(receivedDataChunk);
-                messageHandler_1.messageHandler(parsed, store, user);
+                requestHandler_1.messageHandler(parsed, store, user);
             }
             catch (error) {
                 console.error("json parse error", { error: error, receivedDataChunk: receivedDataChunk });
@@ -67,74 +65,22 @@ var socketCofigurators = {
         console.log("not implimented yet");
     }
 };
-var getNextMessage = function (socket) { return new Promise(function (r, e) { return socket.once("data", function (chunk) { return r(chunk); }); }); };
-//at this point the socket is confired not HTTP, but it may be a fill json client or a 'barecleint' like telnet or netcat. 
-function IdentityGetter(socket, store) {
-    return __awaiter(this, void 0, void 0, function () {
-        var endCB, errorCB, user, isJson, userInfo, chunk, parsed;
-        return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    endCB = function () {
-                        console.log('Closing connection with the client');
-                    };
-                    errorCB = function (err) { return console.log("Error: " + err); };
-                    socket.socket.on('end', endCB);
-                    socket.socket.on('error', errorCB);
-                    console.log("IdentityGetter try");
-                    _a.label = 1;
-                case 1:
-                    if (!!user) return [3 /*break*/, 3];
-                    userInfo = void 0;
-                    return [4 /*yield*/, getNextMessage(socket.socket)
-                        //if json, try parse as login message or try again, else interpret non-json as user name;
-                    ];
-                case 2:
-                    chunk = _a.sent();
-                    //if json, try parse as login message or try again, else interpret non-json as user name;
-                    try {
-                        parsed = JSON.parse(chunk);
-                        if (parsed && parsed.type && parsed.type === message_1.MessageTypes.login) {
-                            userInfo = parsed.payload.userName;
-                            isJson = true;
-                            user = user_1.User.createUser(userInfo, socket);
-                        }
-                        else {
-                            //try again;
-                        }
-                        //if initial message is not json then it is interpreted as name
-                    }
-                    catch (error) {
-                        userInfo = chunk.toString("utf8");
-                        if (userInfo && userInfo.length > 0) {
-                            user = user_1.User.createUser(userInfo, socket);
-                            isJson = false;
-                        }
-                        else {
-                            // try again
-                        }
-                    }
-                    return [3 /*break*/, 1];
-                case 3:
-                    socket.socket.removeListener('end', endCB);
-                    socket.socket.removeListener('error', errorCB);
-                    return [2 /*return*/, { user: user, isJson: isJson }];
-            }
-        });
-    });
-}
 exports.TCPClientSocketHandler = function (socket, store) { return __awaiter(void 0, void 0, void 0, function () {
     var socketWrapper, _a, user, isJson;
     return __generator(this, function (_b) {
         switch (_b.label) {
             case 0:
                 socketWrapper = socket_1.SocketWrapper.createSocketWrapper(socket);
-                return [4 /*yield*/, IdentityGetter(socketWrapper, store)];
+                return [4 /*yield*/, identityGetter_1.IdentityGetter(socketWrapper, store)];
             case 1:
                 _a = _b.sent(), user = _a.user, isJson = _a.isJson;
-                console.log("new user", { name: user.username, id: user.id, isJson: isJson });
-                user.addChannel(store_1.Store.defaultChannel);
-                socketCofigurators[isJson ? "jsonClient" : "bareClient"](user, socketWrapper, store);
+                if (user) {
+                    console.log("new user", { name: user.username, id: user.id, isJson: isJson });
+                    socketCofigurators[isJson ? "jsonClient" : "bareClient"](user, socketWrapper, store);
+                }
+                else {
+                    console.error("bailed out of identity getter");
+                }
                 return [2 /*return*/];
         }
     });

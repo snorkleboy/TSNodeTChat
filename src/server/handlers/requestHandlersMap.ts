@@ -1,21 +1,8 @@
 import { MessageTypes, ActionTypes, DestinationTypes } from "../../messages/message";
-import { HandledRequests} from "../../messages/messageTypeExport"
+import { TextMessagePostResponse, ChannelPostResponse} from "../../messages/messages";
+import { RequestTypeActionResolver} from "../../messages/messageTypeExport";
 import { Channel } from "../store/channel/channel";
-import { newLineArt } from "../../util/newline";
-import { MessageHandlerGen  } from "./messageHandler";
-import { TypeMapper} from "../../util/typeMapper";
-export type MessageActionHandlerMap<M extends HandledRequests> = {
-    [messageType in M["type"]]: {
-        [actionType in TypeMapper<M>[messageType]['action']]: M extends { action: actionType, type: messageType } ?
-        MessageHandlerGen<M>
-        :
-        never
-    }
-};
-
-
-type MessageActionHandlerResolver = MessageActionHandlerMap<HandledRequests>;
-export const messageActionHandlerResolver: MessageActionHandlerResolver = {
+export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
             const { destination, body } = message.payload;
@@ -24,12 +11,12 @@ export const messageActionHandlerResolver: MessageActionHandlerResolver = {
             } else if (destination.type === DestinationTypes.channel) {
                 const channel = user.channels.getByName(destination.val);
                 if (channel) {
-                    channel.forEachUser(u => u.id !== user.id && u.writeToAllSockets(
-                        `${newLineArt(user.username, channel.name)}${body}`
+                    channel.forEachUser(u =>u.writeToAllSockets(
+                        JSON.stringify(new TextMessagePostResponse(message,user))
                     ));
                 } else {
                     console.error("requested message to channel the user is not in", { message, user });
-                }
+                };
             }
         },
     },
@@ -42,7 +29,8 @@ export const messageActionHandlerResolver: MessageActionHandlerResolver = {
             }
             const channel = Channel.getOrCreateChannel(channelName);
             channel.addUser(user);
-            channel.forEachUser(u => u.writeToAllSockets("new user " + user.username))
+            channel.forEachUser(u => u.writeToAllSockets(JSON.stringify(new ChannelPostResponse(message,user))))
+
         },
         [ActionTypes.get]: (message, store, user) => {
             user.writeToAllSockets(JSON.stringify(store.channels.store))
@@ -50,3 +38,5 @@ export const messageActionHandlerResolver: MessageActionHandlerResolver = {
     },
 
 }
+
+const test = (a:string)=>a;

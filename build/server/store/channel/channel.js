@@ -1,5 +1,6 @@
 "use strict";
 exports.__esModule = true;
+var recordStore_1 = require("../recordStore");
 var store_1 = require("../store");
 var channelId = 0;
 var getNewChannelId = function () { return channelId++; };
@@ -8,7 +9,7 @@ var Channel = /** @class */ (function () {
         var _this = this;
         this.id = id;
         this.name = name;
-        this.users = new store_1.RecordStore();
+        this.users = new recordStore_1.RecordStore();
         this.forEachUser = function (cb) { return _this.users.forEach(function (user) { return cb(user); }); };
         this.addUser = function (user) {
             _this.users.add(user);
@@ -36,3 +37,4 @@ var Channel = /** @class */ (function () {
     return Channel;
 }());
 exports.Channel = Channel;
+store_1.Store.defaultChannel = Channel.getOrCreateChannel("all");

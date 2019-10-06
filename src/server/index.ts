@@ -1,11 +1,11 @@
 import { TCPHTTPSwitchServer} from "./server";
-import { TCPClientSocketHandler} from "./handlers/socketHandler";
+import { TCPClientSocketHandler} from "./handlers/socketHandler/socketHandler";
 import { Store } from "./store/store";
 
 const options = {
     port: 3005
 };
-const tcpSockets = Store.createStore();
+const tcpSockets = Store.getStore();
 const serverWrappers = TCPHTTPSwitchServer(
     (socket) => TCPClientSocketHandler(socket, tcpSockets),
     (req, res) => res.end("hello httpServer"),

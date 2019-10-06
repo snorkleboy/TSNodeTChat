@@ -1,6 +1,6 @@
 import { createServer as createHTTPServer} from 'http';
 import { peekIsHttp } from "./util/peakIsHttp";
-import { TCPClientSocketHandler } from './handlers/socketHandler';
+import { TCPClientSocketHandler } from './handlers/socketHandler/socketHandler';
 const Net = require('net');
 const port = 3005;
 export const TCPHTTPSwitchServer = (
