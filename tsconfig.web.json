@@ -5,6 +5,8 @@
         "outDir": "./public/js/",
         "sourceMap": true,
         "target": "es6",
-        "jsx": "react"
+        "jsx": "react",
+            "allowJs": true
+
     }
 }

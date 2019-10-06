@@ -5,7 +5,8 @@
   "main": "test.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "buildReact":"npx webpack"
+    "br":"npx webpack",
+    "bbe": "bash ./scripts/build.sh"
   },
   "author": "",
   "license": "ISC",
