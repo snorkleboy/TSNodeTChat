@@ -12,19 +12,27 @@ export const TCPHTTPSwitchServer = (
     console.log("server start");
     const tcpServer = new Server();
     const httpServer = createHTTPServer(httpRequestHandler);
-    const WebsocketServer = IO(httpServer);
+    const WebsocketServer = IO(httpServer,{
+        pingInterval: 10000,
+        pingTimeout: 50000,
+    });
     WebsocketServer.sockets.on("connection", socketHandler);
 
     tcpServer.on('connection', (socket: Socket & { ['_handle']: any}) => peekIsHttp(socket)
         .then(({httpBool,msg})=>{
-            console.log("TCP connection", { fd: socket._handle.fd, httpBool, msg });
-            if (httpBool) {
-                httpServer.emit("connection", socket);
-                socket.emit("data", msg);
-            } else {
-                socketHandler(socket);
-                socket.emit("data",msg);
+            console.log("TCP connection", { fd: socket &&  socket._handle && socket._handle.fd, httpBool });
+            try {
+                if (httpBool) {
+                    httpServer.emit("connection", socket);
+                    socket.emit("data", msg);
+                } else {
+                    socketHandler(socket);
+                    socket.emit("data", msg);
+                }
+            } catch (error) {
+                console.error("socket to server level error",{error,socket});
             }
+
         })
     );
     tcpServer.on("error", (e) => console.error("tcp server", { e }));

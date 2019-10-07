@@ -20,7 +20,7 @@ export class User implements IdedEntity {
         channel.users.add(this);
         return this;
     }
-
+    static serverUser:User;
     static getUser = (id: number): User => Store.getStore().users.get(id);
     static addUser = (user): User => Store.getStore().users.add(user);
     static createUser = (name: string, socket: WrappedSocket) => new User(getNewUserId(), name, socket);

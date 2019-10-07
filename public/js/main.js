@@ -41844,26 +41844,20 @@ exports.StreamAwaiter = () => {
         waitFor: (checker, timeoutTime = 1000) => new Promise((resolve, rej) => {
             checkers[i++] = { checker, resolve, rej, setTime: Date.now(), timeoutTime };
         }),
-        onData: (msg) => {
+        onData: (parsed) => {
             const checkerArr = Object.entries(checkers);
             if (checkerArr.length > 0) {
-                try {
-                    const parsed = JSON.parse(msg);
-                    checkerArr.forEach(([key, checkerWrapper]) => {
-                        if (checkerWrapper.checker(parsed)) {
-                            delete checkers[key];
-                            checkerWrapper.resolve(parsed);
+                checkerArr.forEach(([key, checkerWrapper]) => {
+                    if (checkerWrapper.checker(parsed)) {
+                        delete checkers[key];
+                        checkerWrapper.resolve(parsed);
+                    }
+                    else {
+                        if (Date.now() - checkerWrapper.setTime > checkerWrapper.timeoutTime) {
+                            checkerWrapper.rej("timeout");
                         }
-                        else {
-                            if (Date.now() - checkerWrapper.setTime > checkerWrapper.timeoutTime) {
-                                checkerWrapper.rej("timeout");
-                            }
-                        }
-                    });
-                }
-                catch (error) {
-                    console.error("StreamAwaiter couldnt parse as json", { msg });
-                }
+                    }
+                });
             }
         }
     });
@@ -41899,10 +41893,12 @@ const messages_1 = __webpack_require__(/*! ../../lib/messages/messages */ "./src
 const message_1 = __webpack_require__(/*! ../../lib/messages/message */ "./src/lib/messages/message.ts");
 const streamAwaiter_1 = __webpack_require__(/*! ../tcpClient/streamAwaiter */ "./src/clients/tcpClient/streamAwaiter.ts");
 const socket_1 = __webpack_require__(/*! ../../lib/store/sockets/socket */ "./src/lib/store/sockets/socket.ts");
+const newline_1 = __webpack_require__(/*! ../../lib/util/newline */ "./src/lib/util/newline.ts");
 const Hello = (props) => (React.createElement("section", null,
     React.createElement(SocketComponent, null)));
 const isChannelPostResponse = (msg) => !!msg.payload.userThatJoined;
 const isLoginResponse = (msg) => !!(msg.payload.userName);
+const isResponseTo = (req, res, otherCheck) => !!(otherCheck(res) && res.type === req.type && res.action === req.action);
 const isTextResponse = (msg) => !!msg.payload.body;
 class SocketComponent extends React.Component {
     constructor(props) {
@@ -41912,71 +41908,79 @@ class SocketComponent extends React.Component {
             msg: "",
             msgs: [],
             channels: [],
+            currentChannel: null,
             auth: false
         };
         this.streamAwaiter = streamAwaiter_1.StreamAwaiter();
-        this.sendToServer = (msg, socket) => {
+        this.sendToServer = (socket, msg, checker = null) => {
             console.log("sending to server", { msg });
-            socket.emit(socket_1.websocketMessageEventName, msg);
+            const str = JSON.stringify(msg);
+            socket.emit(socket_1.websocketMessageEventName, str);
+            if (checker) {
+                return this.streamAwaiter.waitFor(checker);
+            }
+            else {
+                return null;
+            }
+        };
+        this.configureSocket = () => {
+            const socket = socket_io_client_1.default("localhost:3005", {
+                transports: ['websocket']
+            });
+            this.setState({ socket });
+            socket.on(socket_1.websocketMessageEventName, (msg) => {
+                console.log("recieved", { msg });
+                if (typeof msg === 'string') {
+                    try {
+                        msg = JSON.parse(msg);
+                    }
+                    catch (error) {
+                        console.log('json parse error', { msg, error });
+                    }
+                }
+                if (isChannelPostResponse(msg)) {
+                    msg = msg;
+                    this.setState({
+                        msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`]
+                    });
+                }
+                this.streamAwaiter.onData(msg);
+            });
+            return socket;
+        };
+        this.login = (socket) => this.sendToServer(socket, new messages_1.UserPostRequest({ userName: "websocket U" }), m => isLoginResponse(m)).then(msg => this.setState({
+            debug: console.log("recieved login", { msg }),
+            auth: true,
+            channels: msg.payload.channels,
+            currentChannel: msg.payload.channels[0].name
+        }));
+        this.createTextmessage = () => {
+            const req = new messages_1.TextMessagePostRequest({
+                body: this.state.msg,
+                destination: {
+                    type: message_1.DestinationTypes.channel,
+                    val: this.state.currentChannel
+                }
+            });
+            this.sendToServer(this.state.socket, req, (res) => isResponseTo(req, res, isTextResponse))
+                .then(r => this.setState({
+                msgs: [...this.state.msgs, newline_1.newLineArt(r.payload.from.name, this.state.currentChannel)],
+                msg: ""
+            }));
         };
         this.render = () => (React.createElement("section", null,
+            React.createElement("div", null,
+                "channels",
+                React.createElement("div", null, this.state.channels.map(c => React.createElement("div", null, c.name)))),
             React.createElement("div", { className: "flex-column" },
                 React.createElement("div", null,
                     console.log({ state: this.state }),
                     React.createElement("input", { onChange: (e) => this.setState({ msg: e.target.value }) }),
-                    React.createElement("button", { onClick: () => {
-                            this.sendToServer(new messages_1.TextMessagePostRequest({
-                                body: this.state.msg,
-                                destination: {
-                                    type: message_1.DestinationTypes.channel,
-                                    val: this.state.channels[0].name
-                                }
-                            }), this.state.socket);
-                            this.setState({
-                                msgs: [...this.state.msgs],
-                                msg: ""
-                            });
-                        } }, "submit")),
-                React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m)))),
-            React.createElement("div", null,
-                "channels",
-                React.createElement("div", null, this.state.channels.map(c => React.createElement("div", null, c.name))))));
+                    React.createElement("button", { onClick: () => this.createTextmessage() }, "submit")),
+                React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m))))));
     }
     componentDidMount() {
-        const socket = socket_io_client_1.default("localhost:3005", {
-            transports: ['websocket']
-        });
-        this.setState({ socket });
-        socket.on(socket_1.websocketMessageEventName, (msg) => {
-            console.log("recieved", { msg });
-            if (typeof msg === 'string') {
-                try {
-                    msg = JSON.parse(msg);
-                }
-                catch (error) {
-                    console.log('json parse error', { msg, error });
-                }
-            }
-            if (isTextResponse(msg)) {
-                const body = msg.payload.body;
-                this.setState({
-                    msgs: [...this.state.msgs, ` from ${msg.payload.from.name}: ${body}`]
-                });
-            }
-            else if (isLoginResponse(msg)) {
-                this.setState({ auth: true, channels: msg.payload.channels });
-            }
-            else if (isChannelPostResponse(msg)) {
-                this.setState({ auth: true, });
-                this.setState({
-                    msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`]
-                });
-            }
-            this.streamAwaiter.onData(msg);
-        });
-        console.log("sending login");
-        const login = new messages_1.UserPostRequest({ userName: "tima" });
-        this.sendToServer(JSON.stringify(login), socket);
+        this.login(this.configureSocket());
     }
 }
 document.addEventListener("DOMContentLoaded", () => {
@@ -42283,7 +42287,17 @@ const handleIdentityChunk = (chunk, socket) => {
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+const user_1 = __webpack_require__(/*! ../user/user */ "./src/lib/store/user/user.ts");
 const identityGetter_1 = __webpack_require__(/*! ./identityGetter */ "./src/lib/store/sockets/identityGetter.ts");
 const isTCPSocket = (s) => !!(s._writev && s.cork && s.unref);
 const isWebSocket = (s) => !!(s.compress && s.volatile);
@@ -42294,15 +42308,22 @@ class SocketWrapper {
         this.socket = socket;
         this.id = id;
         this.configure = (user, store, messageHandler) => {
-            this.on('end', () => {
-                console.log('Closing connection with the client');
+            const destroy = () => {
+                console.log('destroying socket connection with the client');
                 user.removeSocket(this);
                 this.destroy();
+            };
+            this.on('close', () => {
+                console.log('Closing connection with the client');
+                destroy();
+            });
+            this.on('end', () => {
+                console.log('end connection with the client');
+                destroy();
             });
             this.on('error', err => {
                 console.log(`Socket Error: ${err}`);
-                user.removeSocket(this);
-                this.destroy();
+                destroy();
             });
             this.on('data', (msg) => {
                 try {
@@ -42329,11 +42350,31 @@ SocketWrapper.createSocketWrapper = (socket) => {
         console.error("unknown socket type");
     }
 };
+class FakeServerSocket extends SocketWrapper {
+    constructor(s, i) {
+        super(s, i);
+        this.write = () => { };
+        this.on = () => { };
+        this.once = () => { };
+        this.destroy = () => { };
+        this.getIdentity = () => __awaiter(this, void 0, void 0, function* () { return ({ user: user_1.User.serverUser, isJson: true }); });
+    }
+}
+exports.FakeServerSocket = FakeServerSocket;
+user_1.User.serverUser = user_1.User.createUser("server user", new FakeServerSocket({}, -1));
 //io websockets automatically parse, so this socket does as well. 
 class TCPSocketWrapper extends SocketWrapper {
     constructor() {
         super(...arguments);
-        this.write = (msg) => this.socket.write(msg);
+        this.write = (msg) => {
+            console.log("tcp socket write");
+            this.socket.write(msg, e => {
+                if (e) {
+                    console.log("tcp socket write error", { e, msg, sockId: this.id });
+                    this.socket.emit("close");
+                }
+            });
+        };
         this.on = (e, cb) => {
             if (e === "data") {
                 this.socket.on("data", (m) => {
@@ -42347,6 +42388,9 @@ class TCPSocketWrapper extends SocketWrapper {
                     cb(json);
                 });
             }
+            else {
+                this.socket.on(e, cb);
+            }
         };
         //doesnt give back json, as it may not be json for some clients... needs to be split into json client and bare client with adapter
         this.once = (e, cb) => this.socket.once(e, cb);
@@ -42358,7 +42402,7 @@ exports.TCPSocketWrapper = TCPSocketWrapper;
 exports.websocketMessageEventName = "data";
 const renamer = (e) => {
     let renamedEvent = e;
-    if (e === "end") {
+    if (e === "end" || e === "close") {
         renamedEvent = "dissconnect";
     }
     return renamedEvent;
@@ -42449,6 +42493,21 @@ User.getUser = (id) => store_1.Store.getStore().users.get(id);
 User.addUser = (user) => store_1.Store.getStore().users.add(user);
 User.createUser = (name, socket) => new User(getNewUserId(), name, socket);
 User.forEachUser = () => store_1.Store.getStore().users.forEach;
+
+
+/***/ }),
+
+/***/ "./src/lib/util/newline.ts":
+/*!*********************************!*\
+  !*** ./src/lib/util/newline.ts ***!
+  \*********************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.newLineArt = (name, channel, to = false) => `${name} | ${channel} ||${to ? "=>" : "<="}:`;
 
 
 /***/ }),

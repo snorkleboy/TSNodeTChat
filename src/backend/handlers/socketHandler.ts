@@ -11,10 +11,10 @@ export const socketHandler = async (
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
     let { user, isJson } = await socketWrapper.getIdentity();
     if(user){
-        console.log("new user", { name: user.username, id: user.id, isJson, handle: socket._handle && socket._handle.fd  });
+        console.log("new user", { name: user.username, id: user.id, isJson, swId: socketWrapper.id, handle: socket._handle && socket._handle.fd  });
         User.addUser(user)
             .addChannel(Store.defaultChannel);
-
+        console.log(Object.entries(Store.getStore().users.store).map(([k, u]) => ({ name: u.username, sockets:Object.values(u.sockets.store)})))
         const joinChannelMessage = new ChannelPostResponse(
             new ChannelPostRequest({
                 channelName: Store.defaultChannel.name,

@@ -72,7 +72,15 @@ class Client{
     receiveData = (chunk)=>{
         console.clear();
         this.streamAwaiter.onData(chunk);
-        this.state.msgs.push(`${chunk.toString("utf8")}\n`);
+        let json;
+        try {
+            json = JSON.parse(chunk.toString());
+        } catch (error) {
+            console.error("couldnt parse message",{chunk});
+        }
+        console.log("received",{json});
+        if(json.payload && json.payload.body)
+            this.state.msgs.push(`from ${json.payload.from.name}:${json.payload.body}`);
         this.state.msgs.forEach(m=>console.log(m));
     }
     start = async () => {
@@ -88,21 +96,13 @@ class Client{
         [s =>!s.auth,() => 
             prompt("please Enter Name:\n:")
             .then(name=>{
+                let prom = this.streamAwaiter.waitFor<UserPostResponse>(m => m.isResponse && m.payload && m.payload.userName === name)
+                    .then(m => this.setState({ name: m.payload.userName, channel: m.payload.channels[0], auth: true }))
                 const req = this.makeLoginMessage(name);
-                let prom = this.streamAwaiter.waitFor<UserPostResponse>(m => {
-                    console.log("got back auth response")
-                    if(m.isResponse && m.payload && m.payload.userName === name){
-                        console.log("awaited response", { m });
-                        return true;
-                    }else{
-                        return false
-                    }
-                });
                 this.writeToServer(req);
                 return prom;
             }).then(m => {
-                console.log({m});
-                this.setState({ name:m.payload.userName,channel:m.payload.channels[0], auth: true });
+                console.log("login",{m});
             })
         ],
         [s => s.auth,() => 

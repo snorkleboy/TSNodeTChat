@@ -14,19 +14,26 @@ const isWebSocket = (s:Websocket):s is Websocket=> !!(s.compress && s.volatile)
 let currId: number = 0;
 const getNewSocketId = () => currId++;
 export type RawSocket = TCPSocket | Websocket  
-export type WrappedSocket = TCPSocketWrapper | WebSocketWrapper
+export type WrappedSocket = TCPSocketWrapper | WebSocketWrapper | FakeServerSocket
 export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
     constructor(public socket: T,public id:number){};
     configure = (user: User, store: Store, messageHandler:MessageHandlerGen<HandledRequests>) => {
-        this.on('end', () => {
-            console.log('Closing connection with the client');
+        const destroy = ()=>{
+            console.log('destroying socket connection with the client');
             user.removeSocket(this);
             this.destroy();
+        }
+        this.on('close', () => {
+            console.log('Closing connection with the client');
+            destroy();
+        });
+        this.on('end', () => {
+            console.log('end connection with the client');
+            destroy();
         });
         this.on('error', err => {
             console.log(`Socket Error: ${err}`)
-            user.removeSocket(this);
-            this.destroy();
+            destroy();
         })
         this.on('data', (msg) => {
             try {
@@ -52,9 +59,31 @@ export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
         }
     };
 }
+
+export class FakeServerSocket extends SocketWrapper<any>{
+    constructor(s,i){
+        super(s,i);
+    }
+    write = ()=>{};
+    on = ()=>{};
+    once = ()=>{};
+    destroy = ()=>{};
+    getIdentity = async () => ({user:User.serverUser,isJson:true})
+}
+User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
+
 //io websockets automatically parse, so this socket does as well. 
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
-    write = (msg:string)=>this.socket.write(msg);
+    write = (msg:string)=>{
+        console.log("tcp socket write");
+        this.socket.write(msg,e=>{
+            if(e){
+                console.log("tcp socket write error", { e,msg, sockId: this.id });
+                this.socket.emit("close");
+            }
+
+        })
+    }
     on = (e,cb)=>{
         if(e === "data"){
             this.socket.on("data",(m)=>{
@@ -66,6 +95,8 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
                 }
                 cb(json);
             })
+        }else{
+            this.socket.on(e,cb);
         }
     }
     //doesnt give back json, as it may not be json for some clients... needs to be split into json client and bare client with adapter
@@ -78,7 +109,7 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
 export const websocketMessageEventName = "data";
 const renamer = (e)=>{
     let renamedEvent = e;
-    if (e === "end") {
+    if (e === "end" || e === "close") {
         renamedEvent = "dissconnect";
     }
     return renamedEvent

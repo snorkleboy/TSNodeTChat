@@ -16,7 +16,6 @@ const serverWrapper = TCPHTTPSwitchServer(
     httpApp,
 );
 serverWrapper.listen(listenOptions, () => console.log(`listenting on ${listenOptions.port}`));
-const serverUser = User.createUser("server user", new TCPSocketWrapper(new tcpsocket(), -1));
 process.openStdin().on(
     'data',
     keyBoardLine => store.forEachSocket(socket => socket.write(new TextMessagePostResponse(
@@ -24,7 +23,7 @@ process.openStdin().on(
                 body: keyBoardLine,
                 destination: { type: DestinationTypes.channel, val: "all" } 
             })
-            ,serverUser
+            ,User.serverUser
         )
     ))
 );
