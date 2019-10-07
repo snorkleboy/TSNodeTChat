@@ -19,7 +19,7 @@ const isHttp = (str: string) => {
 //not really a peek anymore, peek library wasnt working
 export const peekIsHttp = async (socket: Socket ): Promise<{httpBool:boolean,msg}> => {
     let httpBool = false;
-    let msg = await getNextMessage(socket,500).catch((e)=>{})
+    let msg = await getNextMessage(socket,500).catch((e)=>{console.log("timed out for message")})
     if(msg){
         let parsed = msg.toString('utf8');
         httpBool = isHttp(parsed);

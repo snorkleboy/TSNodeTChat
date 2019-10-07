@@ -1,4 +1,5 @@
 import { ChannelStore, UserStore } from "./recordStore";
+import { Channel } from "./channel/channel";
 
 
 export class Store { private constructor(){};
@@ -9,7 +10,7 @@ export class Store { private constructor(){};
         return Store.Store
     };
     private static Store:Store;
-    public static defaultChannel;
+    public static defaultChannel:Channel;
     public channels: ChannelStore = new ChannelStore({ 0: Store.defaultChannel});
     public users: UserStore = new UserStore();
     public forEachSocket = (cb) => this.users.forEach(user=>user.forEachSocket(socket=>cb(socket,user)));

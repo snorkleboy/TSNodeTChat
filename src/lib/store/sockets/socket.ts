@@ -68,6 +68,7 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
             })
         }
     }
+    //doesnt give back json, as it may not be json for some clients... needs to be split into json client and bare client with adapter
     once = (e, cb) => this.socket.once(e,cb);
     getIdentity = () => TCPIdentityGetter(this);
     destroy = ()=>this.socket.destroy();
@@ -75,19 +76,20 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
 }
 
 export const websocketMessageEventName = "data";
+const renamer = (e)=>{
+    let renamedEvent = e;
+    if (e === "end") {
+        renamedEvent = "dissconnect";
+    }
+    return renamedEvent
+}
 export class WebSocketWrapper extends SocketWrapper<Websocket>{
     write = (msg) => {
         console.log("send to websocket",{msg});
         this.socket.emit(websocketMessageEventName,msg)
     }
-    once = (e, cb) => this.socket.once(e, cb)
-    on = (e,cb)=>{
-        let renamedEvent = e;
-        if(e === "end"){
-            renamedEvent = "dissconnect";
-        }
-        this.socket.on(renamedEvent,cb);
-    }
+    once = (e, cb) =>this.socket.once(renamer(e), cb)
+    on = (e,cb)=>this.socket.on(renamer(e),cb);
     getIdentity = () => websocketIdentityGetter(this);
     destroy = ()=>{};
 }

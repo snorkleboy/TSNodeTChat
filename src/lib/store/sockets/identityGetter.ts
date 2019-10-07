@@ -73,7 +73,6 @@ const checkLoginMessage = (parsed, socket): {user:User,isJson:Boolean}=>{
         let userInfo = parsed.payload.userName;
         isJson = true;
         user = User.createUser(userInfo, socket)
-            .addChannel(Store.defaultChannel);
     }
     return {user,isJson};
 }

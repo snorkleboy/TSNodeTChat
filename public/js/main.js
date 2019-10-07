@@ -41901,6 +41901,7 @@ const streamAwaiter_1 = __webpack_require__(/*! ../tcpClient/streamAwaiter */ ".
 const socket_1 = __webpack_require__(/*! ../../lib/store/sockets/socket */ "./src/lib/store/sockets/socket.ts");
 const Hello = (props) => (React.createElement("section", null,
     React.createElement(SocketComponent, null)));
+const isChannelPostResponse = (msg) => !!msg.payload.userThatJoined;
 const isLoginResponse = (msg) => !!(msg.payload.userName);
 const isTextResponse = (msg) => !!msg.payload.body;
 class SocketComponent extends React.Component {
@@ -41918,24 +41919,28 @@ class SocketComponent extends React.Component {
             console.log("sending to server", { msg });
             socket.emit(socket_1.websocketMessageEventName, msg);
         };
-        this.render = () => (React.createElement("div", null,
+        this.render = () => (React.createElement("section", null,
+            React.createElement("div", { className: "flex-column" },
+                React.createElement("div", null,
+                    console.log({ state: this.state }),
+                    React.createElement("input", { onChange: (e) => this.setState({ msg: e.target.value }) }),
+                    React.createElement("button", { onClick: () => {
+                            this.sendToServer(new messages_1.TextMessagePostRequest({
+                                body: this.state.msg,
+                                destination: {
+                                    type: message_1.DestinationTypes.channel,
+                                    val: this.state.channels[0].name
+                                }
+                            }), this.state.socket);
+                            this.setState({
+                                msgs: [...this.state.msgs],
+                                msg: ""
+                            });
+                        } }, "submit")),
+                React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m)))),
             React.createElement("div", null,
-                console.log({ state: this.state }),
-                React.createElement("input", { onChange: (e) => this.setState({ msg: e.target.value }) }),
-                React.createElement("button", { onClick: () => {
-                        this.sendToServer(new messages_1.TextMessagePostRequest({
-                            body: this.state.msg,
-                            destination: {
-                                type: message_1.DestinationTypes.channel,
-                                val: this.state.channels[0].name
-                            }
-                        }), this.state.socket);
-                        this.setState({
-                            msgs: [...this.state.msgs],
-                            msg: ""
-                        });
-                    } }, "submit")),
-            React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m)))));
+                "channels",
+                React.createElement("div", null, this.state.channels.map(c => React.createElement("div", null, c.name))))));
     }
     componentDidMount() {
         const socket = socket_io_client_1.default("localhost:3005", {
@@ -41953,13 +41958,19 @@ class SocketComponent extends React.Component {
                 }
             }
             if (isTextResponse(msg)) {
-                const payload = msg.payload.body;
+                const body = msg.payload.body;
                 this.setState({
-                    msgs: [...this.state.msgs, payload]
+                    msgs: [...this.state.msgs, ` from ${msg.payload.from.name}: ${body}`]
                 });
             }
             else if (isLoginResponse(msg)) {
                 this.setState({ auth: true, channels: msg.payload.channels });
+            }
+            else if (isChannelPostResponse(msg)) {
+                this.setState({ auth: true, });
+                this.setState({
+                    msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`]
+                });
             }
             this.streamAwaiter.onData(msg);
         });
@@ -42007,6 +42018,7 @@ class Response {
     constructor(req) {
         this.isResponse = true;
         this.type = req.type;
+        this.action = req.action;
     }
 }
 exports.Response = Response;
@@ -42165,14 +42177,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const message_1 = __webpack_require__(/*! ../../messages/message */ "./src/lib/messages/message.ts");
-const store_1 = __webpack_require__(/*! ../store */ "./src/lib/store/store.ts");
 const user_1 = __webpack_require__(/*! ../user/user */ "./src/lib/store/user/user.ts");
 const getNextMessage_1 = __webpack_require__(/*! ../../../backend/util/getNextMessage */ "./src/backend/util/getNextMessage.ts");
 exports.websocketIdentityGetter = (socket) => __awaiter(void 0, void 0, void 0, function* () {
     let user, isJson;
     let err;
-    while (!user && !err) {
-        let msg = yield getNextMessage_1.getNextMessage(socket, 10000).catch(e => console.log("web socket identity timeout"));
+    let tries = 0;
+    while (!user && !err && tries < 10) {
+        let msg = yield getNextMessage_1.getNextMessage(socket, 10000).catch(e => {
+            err = true;
+            console.log("web socket identity timeout");
+        });
         try {
             msg = JSON.parse(msg);
         }
@@ -42180,9 +42195,9 @@ exports.websocketIdentityGetter = (socket) => __awaiter(void 0, void 0, void 0, 
             console.error("websocket json parse error", { msg });
         }
         ({ user, isJson } = checkLoginMessage(msg, socket));
-        console.log("websocket identity getter", { msg, isJson });
+        tries++;
     }
-    return { user, isJson };
+    return { user, isJson, err };
 });
 //this still may be a bare client or a json client
 exports.TCPIdentityGetter = (socket) => __awaiter(void 0, void 0, void 0, function* () {
@@ -42193,7 +42208,6 @@ exports.TCPIdentityGetter = (socket) => __awaiter(void 0, void 0, void 0, functi
     socket.socket.on('end', endCB);
     socket.socket.on('error', errorCB);
     let err;
-    let startTime = Date.now();
     let user;
     let isJson;
     console.log("IdentityGetter try");
@@ -42214,7 +42228,8 @@ exports.TCPIdentityGetter = (socket) => __awaiter(void 0, void 0, void 0, functi
     socket.socket.removeListener('error', errorCB);
     return {
         user,
-        isJson
+        isJson,
+        err
     };
 });
 const checkLoginMessage = (parsed, socket) => {
@@ -42223,8 +42238,7 @@ const checkLoginMessage = (parsed, socket) => {
     if (parsed && parsed.type && parsed.type === message_1.MessageTypes.login && parsed.action === message_1.ActionTypes.post && parsed.payload && parsed.payload.userName) {
         let userInfo = parsed.payload.userName;
         isJson = true;
-        user = user_1.User.createUser(userInfo, socket)
-            .addChannel(store_1.Store.defaultChannel);
+        user = user_1.User.createUser(userInfo, socket);
     }
     return { user, isJson };
 };
@@ -42234,6 +42248,7 @@ const handleIdentityChunk = (chunk, socket) => {
     let userInfo;
     let user;
     let isJson;
+    let err;
     try {
         parsed = JSON.parse(chunk);
         //if initial message is not json then it is interpreted as a name
@@ -42245,13 +42260,14 @@ const handleIdentityChunk = (chunk, socket) => {
             isJson = false;
         }
         else {
-            // try again
+            err = true;
         }
     }
     ({ user, isJson } = checkLoginMessage(parsed, socket));
     return {
         user,
-        isJson
+        isJson,
+        err
     };
 };
 
@@ -42277,6 +42293,27 @@ class SocketWrapper {
     constructor(socket, id) {
         this.socket = socket;
         this.id = id;
+        this.configure = (user, store, messageHandler) => {
+            this.on('end', () => {
+                console.log('Closing connection with the client');
+                user.removeSocket(this);
+                this.destroy();
+            });
+            this.on('error', err => {
+                console.log(`Socket Error: ${err}`);
+                user.removeSocket(this);
+                this.destroy();
+            });
+            this.on('data', (msg) => {
+                try {
+                    messageHandler(msg, store, user);
+                }
+                catch (error) {
+                    console.error("message handle error", { error, msg });
+                }
+            });
+            console.log("socket configured", user.username);
+        };
     }
     ;
 }
@@ -42292,11 +42329,26 @@ SocketWrapper.createSocketWrapper = (socket) => {
         console.error("unknown socket type");
     }
 };
+//io websockets automatically parse, so this socket does as well. 
 class TCPSocketWrapper extends SocketWrapper {
     constructor() {
         super(...arguments);
         this.write = (msg) => this.socket.write(msg);
-        this.on = (e, cb) => this.socket.on(e, cb);
+        this.on = (e, cb) => {
+            if (e === "data") {
+                this.socket.on("data", (m) => {
+                    let json;
+                    try {
+                        json = JSON.parse(m.toString());
+                    }
+                    catch (error) {
+                        console.error("socket parse error", { id: this.id, m });
+                    }
+                    cb(json);
+                });
+            }
+        };
+        //doesnt give back json, as it may not be json for some clients... needs to be split into json client and bare client with adapter
         this.once = (e, cb) => this.socket.once(e, cb);
         this.getIdentity = () => identityGetter_1.TCPIdentityGetter(this);
         this.destroy = () => this.socket.destroy();
@@ -42304,6 +42356,13 @@ class TCPSocketWrapper extends SocketWrapper {
 }
 exports.TCPSocketWrapper = TCPSocketWrapper;
 exports.websocketMessageEventName = "data";
+const renamer = (e) => {
+    let renamedEvent = e;
+    if (e === "end") {
+        renamedEvent = "dissconnect";
+    }
+    return renamedEvent;
+};
 class WebSocketWrapper extends SocketWrapper {
     constructor() {
         super(...arguments);
@@ -42311,14 +42370,8 @@ class WebSocketWrapper extends SocketWrapper {
             console.log("send to websocket", { msg });
             this.socket.emit(exports.websocketMessageEventName, msg);
         };
-        this.once = (e, cb) => this.socket.once(e, cb);
-        this.on = (e, cb) => {
-            let renamedEvent = e;
-            if (e === "end") {
-                renamedEvent = "dissconnect";
-            }
-            this.socket.on(renamedEvent, cb);
-        };
+        this.once = (e, cb) => this.socket.once(renamer(e), cb);
+        this.on = (e, cb) => this.socket.on(renamer(e), cb);
         this.getIdentity = () => identityGetter_1.websocketIdentityGetter(this);
         this.destroy = () => { };
     }

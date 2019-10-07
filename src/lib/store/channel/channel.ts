@@ -5,7 +5,7 @@ let channelId = 0;
 const getNewChannelId = () => channelId++;
 export class Channel implements IdedEntity {
     private constructor(public id:number,public name:string){};
-
+    defaultChannel:Channel;
     users: RecordStore<User> = new RecordStore<User>();
     forEachUser = (cb: (user: User) =>void)=>this.users.forEach(user=>cb(user));
     addUser = (user:User)=>{

@@ -3,7 +3,7 @@ import * as ReactDOM from "react-dom";
 
 import io from 'socket.io-client';
 import { Socket } from "socket.io";
-import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse } from "../../lib/messages/messages";
+import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse } from "../../lib/messages/messages";
 import { DestinationTypes } from "../../lib/messages/message";
 import { StreamAwaiter } from "../tcpClient/streamAwaiter";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
@@ -25,7 +25,7 @@ interface TypeingProps {
 interface ReceivedMsgs{
     msgs:Array<string>
 }
-
+const isChannelPostResponse = (msg:HandledResponses|UserPostResponse)=>!!(msg as ChannelPostResponse).payload.userThatJoined
 const isLoginResponse = (msg:HandledResponses|UserPostResponse):msg is UserPostResponse=>!!((msg as UserPostResponse).payload.userName)
 const isTextResponse = (msg: HandledResponses | UserPostResponse):msg is TextMessagePostResponse=>!!(msg as TextMessagePostResponse).payload.body
 class SocketComponent extends React.Component {
@@ -55,12 +55,17 @@ class SocketComponent extends React.Component {
                 }
             }
             if (isTextResponse(msg)){
-                const payload = msg.payload.body;
+                const body = msg.payload.body;
                 this.setState({
-                    msgs: [...this.state.msgs, payload]
+                    msgs: [...this.state.msgs, ` from ${msg.payload.from.name}: ${body}`]
                 })
             }else if(isLoginResponse(msg)){
                 this.setState({ auth: true, channels: msg.payload.channels});
+            }else if (isChannelPostResponse(msg)){
+                this.setState({ auth: true,  });
+                this.setState({
+                    msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`]
+                })
             }
             this.streamAwaiter.onData(msg);
 
@@ -74,31 +79,40 @@ class SocketComponent extends React.Component {
         socket.emit(websocketMessageEventName,msg);
     }
     render = ()=>(
-        <div>
-            <div>
-                {console.log({state:this.state})}
-                <input onChange={(e) => this.setState({ msg: e.target.value })} />
-                <button onClick={() => {
-                    this.sendToServer(new TextMessagePostRequest({
-                        body: this.state.msg,
-                        destination: {
-                            type: DestinationTypes.channel,
-                            val: this.state.channels[0].name
-                        }
-                    }),this.state.socket)
-                    this.setState({
-                        msgs: [...this.state.msgs],
-                        msg:""
-                    })
-                }}>submit</button>
+        <section>
+            <div className="flex-column">
+                <div >
+                    {console.log({ state: this.state })}
+                    <input onChange={(e) => this.setState({ msg: e.target.value })} />
+                    <button onClick={() => {
+                        this.sendToServer(new TextMessagePostRequest({
+                            body: this.state.msg,
+                            destination: {
+                                type: DestinationTypes.channel,
+                                val: this.state.channels[0].name
+                            }
+                        }), this.state.socket)
+                        this.setState({
+                            msgs: [...this.state.msgs],
+                            msg: ""
+                        })
+                    }}>submit</button>
+                </div>
+                <ul>
+                    {this.state.msgs.map(m => <li>{m}</li>)}
+                </ul>
             </div>
-            <ul>
-                {this.state.msgs.map(m=><li>{m}</li>)}
-            </ul>
 
-        </div>
+            <div>channels
+                <div>
+                    {this.state.channels.map(c => <div>{c.name}</div>)}
+                </div>
+            </div>
+        </section>
+
     )
 }
+
 document.addEventListener("DOMContentLoaded",()=>{
     ReactDOM.render(
         <Hello compiler="TypeScript" framework="React" />,
