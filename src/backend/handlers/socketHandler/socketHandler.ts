@@ -1,44 +1,47 @@
 import { messageHandler } from "../requestHandler";
-import { IdentityGetter } from "./identityGetter";
-import { SocketWrapper, Store } from "../../../lib/store/store";
+import { TCPIdentityGetter } from "../../../lib/store/sockets/identityGetter";
+import { Store } from "../../../lib/store/store";
 import { User } from "../../../lib/store/user/user";
-type SocketConfigurer = (user: User, socket: SocketWrapper, store: Store) => any;
-const socketCofigurators :{ [key: string]: SocketConfigurer}= {
-    "jsonClient": (user: User, socket: SocketWrapper, store: Store)=> {
-        socket.socket.on('end', () => {
+import { TCPSocketWrapper, RawSocket, WrappedSocket, SocketWrapper } from "../../../lib/store/sockets/socket";
+import { UserPostResponse, UserPostRequest } from "../../../lib/messages/messages";
+type SocketConfigurer = (user: User, socket: WrappedSocket, store: Store) => any;
+const socketCofigurator : SocketConfigurer= (user: User, socket:WrappedSocket , store: Store)=> {
+        socket.on('end', () => {
             console.log('Closing connection with the client');
-            socket.socket.destroy();
+            socket.destroy();
             user.removeSocket(socket);
         });
-        socket.socket.on('error', err => {
+        socket.on('error', err => {
             console.log(`Socket Error: ${err}`)
-            socket.socket.destroy();
+            socket.destroy();
             user.removeSocket(socket);
         })
-        socket.socket.on('data', (receivedDataChunk) => {
+        socket.on('data', (msg) => {
             try {
-                const parsed = JSON.parse(receivedDataChunk);
-                messageHandler(parsed, store, user);
+                const t = typeof msg;
+                if (t !== 'object' || (!msg.action && !msg.type)){
+                    msg = JSON.parse(msg);
+                }
+                messageHandler(msg, store, user);
             } catch (error) {
-                console.error("json parse error", { error, receivedDataChunk });
+                console.error("message handle error", { error, msg });
             }
         });
-    },
-    "bareClient": (user: User, socket: SocketWrapper, store: Store)=>{
-        console.log("not implimented yet");
-    }
+        console.log("socket configured", user.username);
 }
 
 
-export const TCPClientSocketHandler = async (
+export const socketHandler = async (
     socket,
     store: Store,
 ) => {
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
-    let{user,isJson} = await IdentityGetter(socketWrapper, store);
+    let { user, isJson } = await socketWrapper.getIdentity();
     if(user){
-        console.log("new user", { name: user.username, id: user.id, isJson, handle:socket._handle.fd });
-        socketCofigurators[isJson ? "jsonClient" : "bareClient"](user, socketWrapper, store)
+        console.log("new user", { name: user.username, id: user.id, isJson, handle: socket._handle && socket._handle.fd  });
+        User.addUser(user);
+        socketWrapper.write(JSON.stringify(new UserPostResponse(new UserPostRequest({ userName: user.username }), user)));
+        socketCofigurator(user, socketWrapper, store)
     }else{
         console.error("bailed out of identity getter");
     }

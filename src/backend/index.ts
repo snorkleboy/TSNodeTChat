@@ -1,30 +1,25 @@
 import { TCPHTTPSwitchServer} from "./tcp/server";
 import { Store } from "../lib/store/store";
-import { TCPClientSocketHandler} from "./handlers/socketHandler/socketHandler";
+import { socketHandler} from "./handlers/socketHandler/socketHandler";
 import { TextMessagePostRequest, TextMessagePostResponse } from "../lib/messages/messages";
 import { DestinationTypes } from "../lib/messages/message";
 import { httpApp } from "./http/httpApp";
 import { User } from "../lib/store/user/user";
 import { Socket } from "socket.io";
+import { Socket as tcpsocket } from "net";
+import { TCPSocketWrapper } from "../lib/store/sockets/socket";
 const listenOptions = {
     port: 3005
 };
 const tcpSockets = Store.getStore();
 const serverWrapper = TCPHTTPSwitchServer(
-    (socket) => TCPClientSocketHandler(socket, tcpSockets),
+    (socket:tcpsocket) => socketHandler(socket, tcpSockets),
     httpApp,
-    (websocket:Socket) => {
-        websocket.emit('message', 'You are connected!');
-
-        // When the server receives a “message” type signal from the client   
-        websocket.on('message', function (message) {
-            console.log(message);
-        }); 
-    },
+    (websocket: Socket) => socketHandler(websocket,tcpSockets),
 );
 serverWrapper.listen(listenOptions, () => console.log(`listenting on ${listenOptions.port}`));
 
-const serverUser = User.createUser("server",{id:null,socket:null,write:()=>{}});
+const serverUser = User.createUser("server", new TCPSocketWrapper(new tcpsocket(), -1));
 process.openStdin().on(
     'data',
     keyBoardLine => tcpSockets.forEachSocket(socket => socket.write(new TextMessagePostResponse(

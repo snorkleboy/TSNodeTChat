@@ -1,5 +1,4 @@
 import { ChannelStore, UserStore } from "./recordStore";
-export { SocketWrapper } from "./sockets/socket";
 
 
 export class Store { private constructor(){};

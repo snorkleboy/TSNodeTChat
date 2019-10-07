@@ -1,6 +1,7 @@
-import { Socket } from "net";
+import { WrappedSocket } from "../../lib/store/sockets/socket";
 
-export const getNextMessage = (socket:Socket,timeout = null) => new Promise<any>((r, e) => {
+
+export const getNextMessage = <T extends { once: Function }>(socket:T ,timeout = null) => new Promise<any>((r, e) => {
     let timedOut = false;
     let finished = false;
     socket.once("data", (chunk) => {

@@ -85,6 +85,7 @@ class Client{
             .then(name=>{
                 const req = this.makeLoginMessage(name);
                 let prom = this.streamAwaiter.waitFor<UserPostResponse>(m => {
+                    console.log("got back auth response")
                     if(m.isResponse && m.payload && m.payload.userName === name){
                         console.log("awaited response", { m });
                         return true;
@@ -110,6 +111,7 @@ class Client{
     );
     writeToServer = (msg: HandledRequests | UserPostRequest) => {
         const txt = JSON.stringify(msg);
+        console.log("writing to server",{txt});
         this.socket.write(txt);
     }
     makeLoginMessage = (name)=> new UserPostRequest({

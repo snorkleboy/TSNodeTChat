@@ -5,6 +5,7 @@ import { Channel } from "../../lib/store/channel/channel";
 export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
+            console.log({message});
             const { destination, body } = message.payload;
             if (destination.type === DestinationTypes.singleUser) {
                 console.error("not implimented", { message });
@@ -15,7 +16,7 @@ export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
                         JSON.stringify(new TextMessagePostResponse(message,user))
                     ));
                 } else {
-                    console.error("requested message to channel the user is not in", { message, user });
+                    console.error("requested message to channel the user is not in", { message, user:user.username });
                 };
             }
         },
