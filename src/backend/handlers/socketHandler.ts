@@ -15,7 +15,7 @@ export const socketHandler = async (
         socketWrapper.configure(user, store, messageHandler);
         socketWrapper.write(JSON.stringify(new UserPostResponse(new UserPostRequest({ userName: user.username }), user)));
     }else{
-        console.error("bailed out of identity getter",err);
+        console.error("bailed out of identity getter");
     }
 
 }
