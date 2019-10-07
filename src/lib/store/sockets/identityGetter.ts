@@ -9,14 +9,14 @@ import { TCPSocketWrapper, WebSocketWrapper, WrappedSocket } from "./socket";
 //if an http message took longer than 500ms than it may be routed here
 // if it takes longer than 10000ms for any message to come through this will bail out
 
-type identityReturn = { user: User, isJson: Boolean };
+type identityReturn = { user: User, isJson: Boolean,err:any };
 type IdentityGetter =(socket:WrappedSocket)=> Promise<identityReturn>;
 
-export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketWrapper) => {
+export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketWrapper): Promise<identityReturn> => {
     let user,isJson;
     let err;
     let tries = 0;
-    while (!user && !err) {
+    while (!user && !err && tries < 10) {
         let msg = await getNextMessage(socket, 10000).catch(e => {
             err = true; 
             console.log("web socket identity timeout")
@@ -27,9 +27,9 @@ export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketW
             console.error("websocket json parse error",{msg});
         }
         ({ user, isJson } = checkLoginMessage(msg, socket))
-
+        tries++;
     }
-    return {user,isJson};
+    return {user,isJson,err};
 }
 
 //this still may be a bare client or a json client
@@ -42,7 +42,6 @@ export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper)
     socket.socket.on('error', errorCB);
 
     let err;
-    let startTime = Date.now();
     let user;
     let isJson;
     console.log("IdentityGetter try");
@@ -63,10 +62,11 @@ export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper)
     socket.socket.removeListener('error', errorCB);
     return {
         user,
-        isJson
+        isJson,
+        err
     };
 }
-const checkLoginMessage = (parsed, socket): identityReturn=>{
+const checkLoginMessage = (parsed, socket): {user:User,isJson:Boolean}=>{
     let user;
     let isJson;
     if (parsed && parsed.type && parsed.type === MessageTypes.login && parsed.action === ActionTypes.post && parsed.payload && parsed.payload.userName) {
@@ -83,6 +83,7 @@ const handleIdentityChunk = (chunk, socket): identityReturn => {
     let userInfo;
     let user;
     let isJson;
+    let err;
     try {
         parsed = JSON.parse(chunk);
         //if initial message is not json then it is interpreted as a name
@@ -91,14 +92,15 @@ const handleIdentityChunk = (chunk, socket): identityReturn => {
         if (userInfo && userInfo.length > 0) {
             user = User.createUser(userInfo, socket);
             isJson = false;
-        } else {
-            // try again
+        }else{
+            err = true;
         }
 
     }
     ({ user, isJson } = checkLoginMessage(parsed,socket));
     return {
         user,
-        isJson
+        isJson,
+        err
     }
 }

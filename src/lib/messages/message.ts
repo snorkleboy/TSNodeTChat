@@ -26,6 +26,7 @@ export interface Request{
 export abstract class Response<Req extends Request>{
     constructor(req:Req){
         this.type = req.type
+        this.action = req.action;
     }
     type: Req["type"];
     action: Req["action"]

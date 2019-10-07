@@ -1,10 +1,11 @@
-import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest } from "../../lib/messages/messages";
+import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest ,HandledResponses} from "../../lib/messages/messages";
 import { StreamAwaiter } from "./streamAwaiter";
 import {match,when, def} from "../../lib/util/switchExp"
 import { newLineArt} from "../../lib/util/newline"
 import { DestinationTypes } from "../../lib/messages/message";
 var net = require('net');
 const readline = require('readline');
+
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -43,6 +44,10 @@ const makeCommandWhens = (publicCommands: PublicCommands) => Object.entries(publ
 
 
 type ComponentState = clientData & { close: boolean, auth: boolean,msgs:Array<any> };
+
+type setIdentity = ({useName:string})=>Promise<{id:number,channels:Array<any>}>
+
+
 class Client{
     protected streamAwaiter = StreamAwaiter();
     private publicCommands: PublicCommands = commandsMaker(this);

@@ -3,6 +3,10 @@ import { Socket as TCPSocket, Socket} from "net";
 import { Socket as Websocket } from "socket.io";
 import { User } from "../user/user";
 import { TCPIdentityGetter, websocketIdentityGetter } from "./identityGetter";
+import { Store } from "../store";
+import { MessageHandlerGen } from "../../messages/messageTypeExport";
+import { HandledRequests } from "../../messages/messages";
+
 
 
 const isTCPSocket = (s: TCPSocket): s is TCPSocket=>!!((s as TCPSocket)._writev && s.cork && s.unref)
@@ -13,6 +17,26 @@ export type RawSocket = TCPSocket | Websocket
 export type WrappedSocket = TCPSocketWrapper | WebSocketWrapper
 export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
     constructor(public socket: T,public id:number){};
+    configure = (user: User, store: Store, messageHandler:MessageHandlerGen<HandledRequests>) => {
+        this.on('end', () => {
+            console.log('Closing connection with the client');
+            user.removeSocket(this);
+            this.destroy();
+        });
+        this.on('error', err => {
+            console.log(`Socket Error: ${err}`)
+            user.removeSocket(this);
+            this.destroy();
+        })
+        this.on('data', (msg) => {
+            try {
+                messageHandler(msg, store, user);
+            } catch (error) {
+                console.error("message handle error", { error, msg });
+            }
+        });
+        console.log("socket configured", user.username);
+    }
     abstract write:(msg:string)=>void;
     abstract on:(event:string,cb)=>void;
     abstract once:(event:string,cb)=>void;
@@ -28,10 +52,22 @@ export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
         }
     };
 }
-
+//io websockets automatically parse, so this socket does as well. 
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     write = (msg:string)=>this.socket.write(msg);
-    on = (e,cb)=>this.socket.on(e,cb)
+    on = (e,cb)=>{
+        if(e === "data"){
+            this.socket.on("data",(m)=>{
+                let json;
+                try {
+                    json = JSON.parse(m.toString());
+                } catch (error) {
+                    console.error("socket parse error",{id:this.id,m});
+                }
+                cb(json);
+            })
+        }
+    }
     once = (e, cb) => this.socket.once(e,cb);
     getIdentity = () => TCPIdentityGetter(this);
     destroy = ()=>this.socket.destroy();

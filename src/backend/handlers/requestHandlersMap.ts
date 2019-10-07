@@ -1,8 +1,8 @@
-import { RequestTypeActionResolver} from "../../lib/messages/messageTypeExport";
+import { RequestTypeActionToHandlerMap} from "../../lib/messages/messageTypeExport";
 import { MessageTypes, ActionTypes, DestinationTypes } from "../../lib/messages/message";
 import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
 import { Channel } from "../../lib/store/channel/channel";
-export const requestTypeActionHandlerMap: RequestTypeActionResolver = {
+export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
             console.log({message});
