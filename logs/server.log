@@ -1,0 +1,72 @@
+server start
+listenting on 3005
+timed out for message
+TCP connection { fd: 26, httpBool: false }
+IdentityGetter try
+new user { name: 'tim', id: 1, isJson: true, swId: 0, handle: 26 }
+[ { name: 'tim', sockets: [ [TCPSocketWrapper] ] } ]
+socket configured tim
+tcp socket write
+tcp socket write
+TCP connection { fd: 27, httpBool: true }
+new user { name: 'websocket U 822',
+  id: 2,
+  isJson: true,
+  swId: 1,
+  handle: undefined }
+[ { name: 'tim', sockets: [ [TCPSocketWrapper] ] },
+  { name: 'websocket U 822', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 822
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"LOGIN","action":"POST","payload":{"userName":"websocket U 822","channels":[{"name":"all","id":0}]}}' }
+tcp socket write
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 822","isNew":false}}' }
+TCP connection { fd: 28, httpBool: true }
+new user { name: 'websocket U 357',
+  id: 3,
+  isJson: true,
+  swId: 2,
+  handle: undefined }
+[ { name: 'tim', sockets: [ [TCPSocketWrapper] ] },
+  { name: 'websocket U 822', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 357', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 357
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"LOGIN","action":"POST","payload":{"userName":"websocket U 357","channels":[{"name":"all","id":0}]}}' }
+tcp socket write
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 357","isNew":false}}' }
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 357","isNew":false}}' }
+TCP connection { fd: 29, httpBool: true }
+TCP connection { fd: 30, httpBool: true }
+TCP connection { fd: 27, httpBool: true }
+new user { name: 'websocket U 887',
+  id: 4,
+  isJson: true,
+  swId: 3,
+  handle: undefined }
+[ { name: 'tim', sockets: [ [TCPSocketWrapper] ] },
+  { name: 'websocket U 822', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 357', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 887', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 887
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"LOGIN","action":"POST","payload":{"userName":"websocket U 887","channels":[{"name":"all","id":0}]}}' }
+tcp socket write
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 887","isNew":false}}' }
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 887","isNew":false}}' }
+write to websocket { websocketMessageEventName: 'data',
+  msg:
+   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 887","isNew":false}}' }

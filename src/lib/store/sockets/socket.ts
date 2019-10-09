@@ -115,31 +115,6 @@ export class WebSocketWrapper extends SocketWrapper<Websocket>{
         console.log("write to websocket", {websocketMessageEventName,msg});
         this.socket.emit(websocketMessageEventName,msg)
     }
-    configure = (user,store,handler)=>{
-        configureSocket.bind(this)(user,store,handler);
-        this.on("reconnect",(e)=>{
-            console.log("reconnect",{e});
-        })
-        this.on("reconnect_attempt", (e) => {
-            console.log("reconnect_attempt", { e });
-        })
-        this.on("reconnecting", (e) => {
-            console.log("reconnecting", { e });
-        })
-        this.on("reconnect_error", (e) => {
-            console.log("reconnect_error", { e });
-        })
-        this.on("reconnect_failed", (e) => {
-            console.log("reconnect_failed", { e });
-        })
-        this.on("ping", (e) => {
-            console.log("ping", { e });
-        })
-        this.on("pong", (e) => {
-            console.log("pong", { e });
-        });
-        console.log("configured websocket extras");
-    }
     once = (e, cb) =>this.socket.once(renamer(e), cb)
     on = (e,cb)=>{
         if (e=== "data"){
