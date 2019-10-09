@@ -14,5 +14,6 @@ export class Store { private constructor(){};
     public channels: ChannelStore = new ChannelStore({ 0: Store.defaultChannel});
     public users: UserStore = new UserStore();
     public forEachSocket = (cb) => this.users.forEach(user=>user.forEachSocket(socket=>cb(socket,user)));
+    
 }
 

@@ -71,17 +71,20 @@ class Client{
     }
     receiveData = (chunk)=>{
         console.clear();
-        this.streamAwaiter.onData(chunk);
         let json;
         try {
             json = JSON.parse(chunk.toString());
         } catch (error) {
             console.error("couldnt parse message",{chunk});
         }
+
         console.log("received",{json});
-        if(json.payload && json.payload.body)
+        this.streamAwaiter.onData(json);
+        if(json.payload && json.payload.body){
             this.state.msgs.push(`from ${json.payload.from.name}:${json.payload.body}`);
-        this.state.msgs.forEach(m=>console.log(m));
+            this.state.msgs.forEach(m => console.log(m));
+        }
+
     }
     start = async () => {
         while (!this.state.close) {
@@ -96,7 +99,14 @@ class Client{
         [s =>!s.auth,() => 
             prompt("please Enter Name:\n:")
             .then(name=>{
-                let prom = this.streamAwaiter.waitFor<UserPostResponse>(m => m.isResponse && m.payload && m.payload.userName === name)
+                let prom = this.streamAwaiter.waitFor<UserPostResponse>(m => {
+                    if (m.isResponse && m.payload && m.payload.userName === name){
+                        console.log("received login",{m})
+                        return true;
+                    }else{
+                        console.log("received something else",{m});
+                    }
+                })
                     .then(m => this.setState({ name: m.payload.userName, channel: m.payload.channels[0], auth: true }))
                 const req = this.makeLoginMessage(name);
                 this.writeToServer(req);

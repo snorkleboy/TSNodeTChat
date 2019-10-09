@@ -72,7 +72,10 @@ const checkLoginMessage = (parsed, socket): {user:User,isJson:Boolean}=>{
     if (parsed && parsed.type && parsed.type === MessageTypes.login && parsed.action === ActionTypes.post && parsed.payload && parsed.payload.userName) {
         let userInfo = parsed.payload.userName;
         isJson = true;
-        user = User.createUser(userInfo, socket)
+        user = User.getUserByName(userInfo);
+        if(!user){
+            user = User.createUser(userInfo, socket)
+        }
     }
     return {user,isJson};
 }

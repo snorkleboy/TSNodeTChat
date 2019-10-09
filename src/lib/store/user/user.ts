@@ -22,6 +22,17 @@ export class User implements IdedEntity {
     }
     static serverUser:User;
     static getUser = (id: number): User => Store.getStore().users.get(id);
+    static getUserByName = (name: string): User => {
+        let user;
+        Store.getStore().users.forEach(u => {
+            if (u.username === name) {
+                user = u;
+            }
+        })
+        return user;
+    }
+    
+
     static addUser = (user): User => Store.getStore().users.add(user);
     static createUser = (name: string, socket: WrappedSocket) => new User(getNewUserId(), name, socket);
     static forEachUser = ()=>Store.getStore().users.forEach;

@@ -4,6 +4,8 @@ import IO from "socket.io";
 import {Server, Socket} from "net"
 import { RawSocket } from '../../lib/store/sockets/socket';
 const port = 3005;
+
+
 export const TCPHTTPSwitchServer = (
     socketHandler:(s:RawSocket)=>void,
     httpRequestHandler,
@@ -16,7 +18,7 @@ export const TCPHTTPSwitchServer = (
         pingInterval: 10000,
         pingTimeout: 50000,
     });
-    WebsocketServer.sockets.on("connection", socketHandler);
+    WebsocketServer.on("connection", socketHandler);
 
     tcpServer.on('connection', (socket: Socket & { ['_handle']: any}) => peekIsHttp(socket)
         .then(({httpBool,msg})=>{

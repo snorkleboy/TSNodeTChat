@@ -57,7 +57,8 @@ export class ChannelPostResponse extends Response<ChannelPostRequest> {
     action: ActionTypes.post = ActionTypes.post
     constructor(msg: ChannelPostRequest, user: User, public payload = {
         channelName: msg.payload.channelName,
-        userThatJoined: user.username
+        userThatJoined: user.username,
+        isNew:false
     }) { super(msg) }
 }
 export class ChannelGetRequest implements Request {

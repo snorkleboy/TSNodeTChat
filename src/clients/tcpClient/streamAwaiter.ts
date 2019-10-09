@@ -19,7 +19,7 @@ export const StreamAwaiter = () => {
                         delete checkers[key];
                         checkerWrapper.resolve(parsed);
                     } else {
-                        if (Date.now() - checkerWrapper.setTime > checkerWrapper.timeoutTime) {
+                        if (checkerWrapper.timeoutTime && Date.now() - checkerWrapper.setTime > checkerWrapper.timeoutTime) {
                             checkerWrapper.rej("timeout");
                         }
                     }

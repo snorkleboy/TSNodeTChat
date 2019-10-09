@@ -21,14 +21,16 @@ export class Channel implements IdedEntity {
 
     static createChannel = (name): Channel => new Channel(getNewChannelId(), name);
     static getOrCreateChannel = (name:string)=>{
+        let isNew = false;
         let channel = Channel.getChannelByName(name);
         if(!channel){
             channel = Channel.addChannel(Channel.createChannel(name))
+            isNew = true;
         }
-        return channel;
+        return {channel,isNew};
     }
     static forEachUser = () => Store.getStore().channels.forEach;
 
 }
 
-Store.defaultChannel = Channel.getOrCreateChannel("all");
+Store.defaultChannel = Channel.getOrCreateChannel("all").channel;

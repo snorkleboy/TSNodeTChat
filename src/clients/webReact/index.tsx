@@ -1,9 +1,9 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-
+require("./main.css");
 import io from 'socket.io-client';
 import { Socket } from "socket.io";
-import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests } from "../../lib/messages/messages";
+import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests, ChannelPostRequest } from "../../lib/messages/messages";
 import { DestinationTypes } from "../../lib/messages/message";
 import { StreamAwaiter ,StreamChecker} from "../tcpClient/streamAwaiter";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
@@ -14,12 +14,13 @@ const Hello = (props: HelloProps) => (
         <SocketComponent/>
     </section>
 )
-
+console.log({ websocketMessageEventName})
 interface SocketProps {
     socket:Socket,
     auth:false,
-    channels:Array<any>,
-    currentChannel:string
+    channels:Array<string>,
+    currentChannel:string,
+    userName:string
 }
 interface TypeingProps {
     msg:string
@@ -51,7 +52,8 @@ class SocketComponent extends React.Component {
         msgs:[],
         channels:[],
         currentChannel:null,
-        auth:false
+        auth:false,
+        userName: "websocket U " + Date.now()%1000 
     }
     streamAwaiter = StreamAwaiter();
     constructor(props){
@@ -68,13 +70,32 @@ class SocketComponent extends React.Component {
         }
     }
     componentDidMount(){
-        this.login(this.configureSocket());
+        this.configureSocket();
     }
     configureSocket = ()=>{
         const socket = io("localhost:3005", {
             transports: ['websocket']
         })
         this.setState({ socket });
+        socket.on("error",(e)=>{console.log("error",{e})});
+        socket.on("connect_error", (e) => { console.log("connect_error", { e }) });
+        socket.on("connect_timeout", (e) => { console.log("connect_timeout", { e }) });
+            
+        socket.on("reconnect_attempt", (e) => { 
+            console.log("reconnect_attempt", new Date().getMinutes(), { e }); this.setState({ auth: false })
+        });
+        socket.on("reconnect", (e) => console.log("reconnect"));
+        socket.on("reconnecting", (e) => { console.log("reconnecting", new Date().getMinutes(), { e }) });
+        socket.on("reconnect_error", (e) => { console.log("reconnect_error",new Date().getMinutes(), { e }) });
+        socket.on("reconnect_failed", (e) => { console.log("reconnect_failed", new Date().getMinutes(), { e }) });
+
+
+        socket.on("dissconnect", (e) => { console.log("dissconnect", { e }) });
+        socket.on("connect", (e) => {
+            this.login(this.state.socket);
+            console.log("connect", new Date().getMinutes(), { e }) 
+        });
+
         socket.on(websocketMessageEventName, (msg: HandledResponses | UserPostResponse) => {
             console.log("recieved", { msg });
             if (typeof msg === 'string') {
@@ -84,28 +105,53 @@ class SocketComponent extends React.Component {
                     console.log('json parse error', { msg, error });
                 }
             }
-            if (isChannelPostResponse(msg)) {
-                msg = msg as ChannelPostResponse
-                this.setState({
-                    msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`]
-                })
+            if(this.state.auth){
+                if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
+                    this.setState({
+                        msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
+                    })
+                }
+                if (isChannelPostResponse(msg) && (msg as ChannelPostResponse).payload.channelName !== this.state.currentChannel) {
+                    msg = msg as ChannelPostResponse
+                    this.setState({
+                        msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`],
+                        channels: [...this.state.channels, msg.payload.channelName]
+                    })
+
+                }
             }
             this.streamAwaiter.onData(msg);
+
 
         })
         return socket;
     }
     login = (socket)=>this.sendToServer<UserPostRequest, UserPostResponse>(
             socket,
-            new UserPostRequest({ userName: "websocket U" }),
+            new UserPostRequest({ userName: this.state.userName}),
             m => isLoginResponse(m)
         ).then(msg => this.setState({
-            debug:console.log("recieved login",{msg}),
             auth: true,
-            channels: msg.payload.channels,
+            channels: msg.payload.channels.map(c=>c.name),
             currentChannel: msg.payload.channels[0].name
-        }))
-    
+        })).then(()=>console.log("login recieved")).catch(e=>console.log("didnt recive login in time",{e}))
+    createChannelPostMessage = (c)=>{
+        const req = new ChannelPostRequest({
+            channelName:c,
+            switchTo:true
+        })
+        this.sendToServer<ChannelPostRequest, ChannelPostResponse>(
+            this.state.socket, req, (res) => isResponseTo(req, res, isChannelPostResponse)
+        )
+            .then(r => this.setState({
+                msgs: [],
+                msg: "",
+                currentChannel:r.payload.channelName
+            }))
+            .catch(e=>{
+                console.log("channel change not responsed to ",{e});
+            })
+    }
     createTextmessage = () => {
         const req = new TextMessagePostRequest({
             body: this.state.msg,
@@ -118,27 +164,34 @@ class SocketComponent extends React.Component {
             this.state.socket, req, (res) => isResponseTo(req, res, isTextResponse)
         )
         .then(r => this.setState({
-            msgs: [...this.state.msgs, newLineArt(r.payload.from.name, this.state.currentChannel)],
+            msgs: [...this.state.msgs, `${newLineArt(r.payload.from.name, this.state.currentChannel)} ${r.payload.body}`],
             msg: ""
         }));
     }
     render = ()=>(
-        <section className="flex-row">
-            <div>channels
+        <section className="top flex-row">
+            currentChannel:{this.state.currentChannel}
+            {console.log(this.state)}
+            <div className="channelBox">
                 <div>
-                    {this.state.channels.map(c => <div>{c.name}</div>)}
+                    channels
+                </div>
+                <div>
+                    {this.state.channels.map(c => (
+                        <div onClick={()=>this.createChannelPostMessage(c)}
+                        >{c}</div>
+                    ))}
                 </div>
             </div>
-
-            <div className="flex-column">
-                <div >
-                    {console.log({ state: this.state })}
-                    <input onChange={(e) => this.setState({ msg: e.target.value })} />
-                    <button onClick={()=>this.createTextmessage()}>submit</button>
-                </div>
+            
+            <div className="messageBox flex-column">
                 <ul>
                     {this.state.msgs.map(m => <li>{m}</li>)}
                 </ul>
+                <div className="messageBox-input flex-row">
+                    <input placeholder="Enter Message" value={this.state.msg} onChange={(e) => this.setState({ msg: e.target.value })} />
+                    <button onClick={() => this.createTextmessage()}></button>
+                </div>
             </div>
 
  

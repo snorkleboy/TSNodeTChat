@@ -2,10 +2,10 @@ import { RequestTypeActionToHandlerMap} from "../../lib/messages/messageTypeExpo
 import { MessageTypes, ActionTypes, DestinationTypes } from "../../lib/messages/message";
 import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
 import { Channel } from "../../lib/store/channel/channel";
+import { Store } from "../../lib/store/store";
 export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
-            console.log({message});
             const { destination, body } = message.payload;
             if (destination.type === DestinationTypes.singleUser) {
                 console.error("not implimented", { message });
@@ -28,9 +28,15 @@ export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
             if (switchTo) {
                 user.channels.forEach(channel => channel.removeUser(user));
             }
-            const channel = Channel.getOrCreateChannel(channelName);
+            const {channel,isNew} = Channel.getOrCreateChannel(channelName);
+            const res = new ChannelPostResponse(message, user);
             channel.addUser(user);
-            channel.forEachUser(u => u.writeToAllSockets(JSON.stringify(new ChannelPostResponse(message,user))))
+            if (isNew){
+                res.payload.isNew = true;
+                Store.getStore().users.forEach(u => u.writeToAllSockets(JSON.stringify(res)))
+            }else{
+                channel.forEachUser(u => u.writeToAllSockets(JSON.stringify(res)))
+            }
         },
         [ActionTypes.get]: (message, store, user) => {
             user.writeToAllSockets(JSON.stringify(store.channels.store))

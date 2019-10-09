@@ -7,6 +7,24 @@ import { httpApp } from "./http/httpApp";
 import { User } from "../lib/store/user/user";
 import { Socket as tcpsocket } from "net";
 import { TCPSocketWrapper, RawSocket } from "../lib/store/sockets/socket";
+import * as fs from 'fs';
+
+
+const myLogFileStream = fs.createWriteStream("./logs/server.log");
+const myConsole = new console.Console(myLogFileStream, myLogFileStream);
+const oldLog = console.log;
+const oldErr = console.error;
+console.log = function (...args) {
+    oldLog(...args);
+    myConsole.log(...args);
+}
+console.error = function (...args) {
+    oldErr(...args);
+    myConsole.error(...args);
+}
+
+
+
 const listenOptions = {
     port: 3005
 };
