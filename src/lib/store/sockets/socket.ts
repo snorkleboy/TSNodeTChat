@@ -71,7 +71,6 @@ User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
 
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     write = (msg:string)=>{
-        console.log("tcp socket write");
         this.socket.write(msg,e=>{
             if(e){
                 console.log("tcp socket write error", { e,msg, sockId: this.id });
@@ -112,7 +111,6 @@ const renamer = (e)=>{
 }
 export class WebSocketWrapper extends SocketWrapper<Websocket>{
     write = (msg) => {
-        console.log("write to websocket", {websocketMessageEventName,msg});
         this.socket.emit(websocketMessageEventName,msg)
     }
     once = (e, cb) =>this.socket.once(renamer(e), cb)
