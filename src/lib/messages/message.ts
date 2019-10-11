@@ -17,6 +17,7 @@ export enum DestinationTypes {
 export interface MessageLike {
     type: MessageTypes,
     action: ActionTypes
+    payload:any
 }
 export interface Request{
     type: MessageTypes

@@ -55,9 +55,11 @@ class SocketComponent extends React.Component {
         auth:false,
         userName: "websocket U " + Date.now()%1000 
     }
+    videoWebCamRef
     streamAwaiter = StreamAwaiter();
     constructor(props){
         super(props);
+        this.videoWebCamRef = React.createRef();
     }
     sendToServer: sendToServer = (socket, msg, checker = null) => {
         console.log("sending to server", { msg });
@@ -71,6 +73,17 @@ class SocketComponent extends React.Component {
     }
     componentDidMount(){
         this.configureSocket();
+        if (navigator.mediaDevices.getUserMedia) {
+            const video = this.videoWebCamRef.current;
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (stream) {
+                    video.srcObject = stream;
+                    console.log({stream});
+                })
+                .catch(function (err0r) {
+                    console.log("Something went wrong!");
+                });
+        }
     }
     configureSocket = ()=>{
         const socket = io("localhost:3005", {
@@ -169,33 +182,37 @@ class SocketComponent extends React.Component {
         }));
     }
     render = ()=>(
-        <section className="top flex-row">
-            currentChannel:{this.state.currentChannel}
-            {console.log(this.state)}
-            <div className="channelBox">
-                <div>
-                    channels
+        <section className="top" >
+            current channel:{this.state.currentChannel}
+            <div className="flex-row">
+                {console.log(this.state)}
+                <div className="channelBox">
+                    <div>
+                        channels
+                    </div>
+                    <div>
+                        {this.state.channels.map(c => (
+                            <div onClick={() => this.createChannelPostMessage(c)}
+                            >{c}</div>
+                        ))}
+                    </div>
                 </div>
-                <div>
-                    {this.state.channels.map(c => (
-                        <div onClick={()=>this.createChannelPostMessage(c)}
-                        >{c}</div>
-                    ))}
-                </div>
-            </div>
-            
-            <div className="messageBox flex-column">
-                <ul>
-                    {this.state.msgs.map(m => <li>{m}</li>)}
-                </ul>
-                <div className="messageBox-input flex-row">
-                    <input placeholder="Enter Message" value={this.state.msg} onChange={(e) => this.setState({ msg: e.target.value })} />
-                    <button onClick={() => this.createTextmessage()}></button>
-                </div>
-            </div>
 
- 
+                <div className="messageBox flex-column">
+                    <ul>
+                        {this.state.msgs.map(m => <li>{m}</li>)}
+                    </ul>
+                    <div className="messageBox-input flex-row">
+                        <input placeholder="Enter Message" value={this.state.msg} onChange={(e) => this.setState({ msg: e.target.value })} />
+                        <button onClick={() => this.createTextmessage()}></button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <video autoPlay ref={this.videoWebCamRef} id="videoElement"></video>
+            </div>
         </section>
+
 
     )
 }

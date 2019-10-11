@@ -9,6 +9,7 @@ export const socketHandler = async (
     store: Store,
 ) => {
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
+    console.log("IdentityGetter try", (socket as any)._handle && (socket as any)._handle.fd && { fd: (socket as any)._handle.fd });
     let { user, isJson } = await socketWrapper.getIdentity();
     if(user){
         console.log("new user", { name: user.username, id: user.id, isJson, swId: socketWrapper.id, handle: socket._handle && socket._handle.fd  });
@@ -17,14 +18,14 @@ export const socketHandler = async (
         console.log(Object.entries(Store.getStore().users.store).map(([k, u]) => ({ name: u.username, sockets:Object.values(u.sockets.store)})))
 
         socketWrapper.configure(user, store, messageHandler);
-        socketWrapper.write(JSON.stringify(new UserPostResponse(new UserPostRequest({ userName: user.username }), user)));
+        socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
         const joinChannelMessage = new ChannelPostResponse(
             new ChannelPostRequest({
                 channelName: Store.defaultChannel.name,
                 switchTo: true
             }), user
         );
-        Store.defaultChannel.forEachUser(u => u.writeToAllSockets(JSON.stringify(joinChannelMessage)))
+        Store.defaultChannel.forEachUser(u => u.writeToAllSockets(joinChannelMessage))
 
     }else{
         console.error("bailed out of identity getter");

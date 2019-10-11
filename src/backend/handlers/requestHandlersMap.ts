@@ -1,6 +1,6 @@
 import { RequestTypeActionToHandlerMap} from "../../lib/messages/messageTypeExport";
 import { MessageTypes, ActionTypes, DestinationTypes } from "../../lib/messages/message";
-import { TextMessagePostResponse, ChannelPostResponse } from "../../lib/messages/messages";
+import { TextMessagePostResponse, ChannelPostResponse, ChannelGetResponse } from "../../lib/messages/messages";
 import { Channel } from "../../lib/store/channel/channel";
 import { Store } from "../../lib/store/store";
 export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
@@ -13,7 +13,7 @@ export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
                 const channel = user.channels.getByName(destination.val);
                 if (channel) {
                     channel.forEachUser(u =>u.writeToAllSockets(
-                        JSON.stringify(new TextMessagePostResponse(message,user))
+                        new TextMessagePostResponse(message,user)
                     ));
                 } else {
                     console.error("requested message to channel the user is not in", { message, user:user.username });
@@ -33,13 +33,13 @@ export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
             channel.addUser(user);
             if (isNew){
                 res.payload.isNew = true;
-                Store.getStore().users.forEach(u => u.writeToAllSockets(JSON.stringify(res)))
+                Store.getStore().users.forEach(u => u.writeToAllSockets(res))
             }else{
-                channel.forEachUser(u => u.writeToAllSockets(JSON.stringify(res)))
+                channel.forEachUser(u => u.writeToAllSockets(res))
             }
         },
         [ActionTypes.get]: (message, store, user) => {
-            user.writeToAllSockets(JSON.stringify(store.channels.store))
+            user.writeToAllSockets(new ChannelGetResponse(message,user));
         }
     },
 

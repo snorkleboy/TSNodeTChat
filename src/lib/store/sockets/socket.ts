@@ -5,7 +5,9 @@ import { User } from "../user/user";
 import { TCPIdentityGetter, websocketIdentityGetter } from "./identityGetter";
 import { Store } from "../store";
 import { MessageHandlerGen } from "../../messages/messageTypeExport";
-import { HandledRequests } from "../../messages/messages";
+import { HandledRequests, TextMessagePostRequest, TextMessagePostResponse } from "../../messages/messages";
+import { DestinationTypes, MessageLike, MessageTypes, ActionTypes } from "../../messages/message";
+import { newLineArt } from "../../util/newline";
 
 
 const  configureSocket = function(user: User, store: Store, messageHandler: MessageHandlerGen<HandledRequests>) {
@@ -41,7 +43,7 @@ export type WrappedSocket = TCPSocketWrapper | WebSocketWrapper | FakeServerSock
 export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
     constructor(public socket: T,public id:number){};
     public configure = configureSocket.bind(this);
-    abstract write:(msg:string)=>void;
+    abstract write:(msg:MessageLike)=>void;
     abstract on:(event:string,cb)=>void;
     abstract once:(event:string,cb)=>void;
     abstract destroy:()=>void;
@@ -70,25 +72,67 @@ export class FakeServerSocket extends SocketWrapper<any>{
 User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
 
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
-    write = (msg:string)=>{
-        this.socket.write(msg,e=>{
-            if(e){
-                console.log("tcp socket write error", { e,msg, sockId: this.id });
-                this.socket.emit("close");
+    isJson:Boolean;
+    user: User;
+    configure = (user: User, store: Store, messageHandler: MessageHandlerGen<HandledRequests>)=>{
+        configureSocket.bind(this)(user, store, messageHandler);
+        
+    }
+    write = (msg:MessageLike)=>{
+        if(this.isJson){
+                this.socket.write(JSON.stringify(msg), e => {
+                if (e) {
+                    console.log("tcp socket write error", { e, msg, sockId: this.id });
+                    this.socket.emit("close");
+                }
+            })
+        }else{
+            if (
+                msg.type === MessageTypes.textMessage && 
+                msg.action === ActionTypes.post && 
+                (msg as TextMessagePostResponse).isResponse && (msg as TextMessagePostResponse).payload.from.name !== this.user.username
+            ){
+                const lineStart = newLineArt((msg as TextMessagePostResponse).payload.from.name,"all",true)
+                this.socket.write(`\n${lineStart}${(msg as TextMessagePostResponse).payload.body}\n`, e => {
+                    if (e) {
+                        console.log("raw tcp socket write error", { e, msg, sockId: this.id });
+                        this.socket.emit("close");
+                    }
+                })
             }
+        }
 
+    }
+    private onDataIsJson = (m,next)=>{
+        let json;
+        try {
+            json = JSON.parse(m.toString());
+        } catch (error) {
+            console.error("socket parse error", { id: this.id, m });
+        }
+        next(json);
+    }
+    private onDataNotJson = (m,next)=>{
+        console.error("raw client message, PARTAILLY IMPLIMENTED",{m});
+        const str = m.toString();
+        const json = new TextMessagePostRequest({
+            body:str,
+            destination:{
+                type:DestinationTypes.channel,
+                val: (c => c ? c.name : "all")(this.user.channels.getList[0])
+            }
         })
+        console.log(this.user.channels.getList[0]);
+        next(json);
     }
     on = (e,cb)=>{
         if(e === "data"){
             this.socket.on("data",(m)=>{
-                let json;
-                try {
-                    json = JSON.parse(m.toString());
-                } catch (error) {
-                    console.error("socket parse error",{id:this.id,m});
+                if(this.isJson){
+                    this.onDataIsJson(m,cb);
+                }else{
+                    this.onDataNotJson(m,cb);
                 }
-                cb(json);
             })
         }else{
             this.socket.on(e,cb);
@@ -96,7 +140,16 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     }
     //doesnt give back json, as it may not be json for some clients... needs to be split into json client and bare client with adapter
     once = (e, cb) => this.socket.once(e,cb);
-    getIdentity = () => TCPIdentityGetter(this);
+    getIdentity = () => {
+        const prom =  TCPIdentityGetter(this)   
+        .then(ret=>{
+            this.isJson = ret.isJson;
+            this.user = ret.user;
+            return ret;
+        })
+        
+        return prom; 
+    }
     destroy = ()=>this.socket.destroy();
 
 }
@@ -111,7 +164,7 @@ const renamer = (e)=>{
 }
 export class WebSocketWrapper extends SocketWrapper<Websocket>{
     write = (msg) => {
-        this.socket.emit(websocketMessageEventName,msg)
+        this.socket.emit(websocketMessageEventName, JSON.stringify(msg))
     }
     once = (e, cb) =>this.socket.once(renamer(e), cb)
     on = (e,cb)=>{

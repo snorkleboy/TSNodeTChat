@@ -2,6 +2,7 @@ import { ChannelStore, RecordStore, IdedEntity } from "../recordStore"
 import { Channel } from "../channel/channel";
 import {  WrappedSocket } from "../sockets/socket";
 import { Store } from "../store";
+import { MessageLike } from "../../messages/message";
 let userId = 0;
 
 const getNewUserId = ()=>userId++;
@@ -12,7 +13,7 @@ export class User implements IdedEntity {
     channels: ChannelStore = new ChannelStore();
     sockets: RecordStore<WrappedSocket> = new RecordStore<WrappedSocket>();
     forEachSocket = (cb: (s: WrappedSocket)=>void) => this.sockets.forEach((s)=>cb(s));
-    writeToAllSockets = (m:string)=>this.sockets.forEach(s=>s.write(m));
+    writeToAllSockets = (m:MessageLike)=>this.sockets.forEach(s=>s.write(m));
     addSocket = (socket: WrappedSocket)=>this.sockets.add(socket);
     removeSocket = (socket)=>this.sockets.remove(socket);
     addChannel = (channel:Channel)=>{

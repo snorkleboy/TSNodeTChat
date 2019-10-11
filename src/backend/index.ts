@@ -1,9 +1,9 @@
-import { TCPHTTPSwitchServer} from "./tcp/server";
+import { TCPHTTPSwitchServer} from "./server";
 import { Store } from "../lib/store/store";
 import { socketHandler} from "./handlers/socketHandler";
 import { TextMessagePostRequest, TextMessagePostResponse } from "../lib/messages/messages";
 import { DestinationTypes } from "../lib/messages/message";
-import { httpApp } from "./http/httpApp";
+import { httpApp } from "./httpApp";
 import { User } from "../lib/store/user/user";
 import { Socket as tcpsocket } from "net";
 import { TCPSocketWrapper, RawSocket } from "../lib/store/sockets/socket";

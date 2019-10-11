@@ -1,5 +1,6 @@
 import { Request, Response,ActionTypes,DestinationTypes,MessageTypes} from "./message";
 import { User } from "../store/user/user";
+import { Store } from "../store/store";
 export type HandledRequests =
     | TextMessagePostRequest
     | ChannelPostRequest
@@ -53,8 +54,6 @@ export class ChannelPostRequest implements Request {
     }) { }
 }
 export class ChannelPostResponse extends Response<ChannelPostRequest> {
-    type: MessageTypes.channelCommand = MessageTypes.channelCommand
-    action: ActionTypes.post = ActionTypes.post
     constructor(msg: ChannelPostRequest, user: User, public payload = {
         channelName: msg.payload.channelName,
         userThatJoined: user.username,
@@ -67,3 +66,8 @@ export class ChannelGetRequest implements Request {
     constructor(public payload = undefined) { }
 }
 
+export class ChannelGetResponse extends Response<ChannelGetRequest> {
+    constructor(msg: ChannelGetRequest, user: User, public payload = {
+        channels: Store.getStore().channels.getList()
+    }) { super(msg) }
+}

@@ -3,7 +3,7 @@ import { UserPostResponse } from "../../messages/messages";
 import { Store } from "../store";
 import { User } from "../user/user";
 
-import { getNextMessage} from "../../../backend/util/getNextMessage"
+import { getNextMessage} from "../../util/getNextMessage";
 import { TCPSocketWrapper, WebSocketWrapper, WrappedSocket } from "./socket";
 //at this point the socket is 'confired' not HTTP, but it may be a full json client or a 'barecleint' like telnet or netcat.
 //if an http message took longer than 500ms than it may be routed here
@@ -16,7 +16,7 @@ export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketW
     let user,isJson;
     let err;
     let tries = 0;
-    while (!user && !err && tries < 10) {
+    while (!user && !err && tries < 3) {
         let msg = await getNextMessage(socket, 10000).catch(e => {
             err = true; 
             console.log("web socket identity timeout")
@@ -31,7 +31,6 @@ export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketW
     }
     return {user,isJson,err};
 }
-
 //this still may be a bare client or a json client
 export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper): Promise<identityReturn>=>{
     const endCB = () => {
@@ -44,8 +43,8 @@ export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper)
     let err;
     let user;
     let isJson;
-    console.log("IdentityGetter try");
-    while (!user && !err) {
+    let tries = 0;
+    while (!user && !err && tries<3) {
         const chunk = await getNextMessage(socket,10000)
             .catch(e => {
                 err = true;
@@ -86,20 +85,24 @@ const handleIdentityChunk = (chunk, socket): identityReturn => {
     let user;
     let isJson;
     let err;
+    console.log("handle chunk", { chunk, user, isJson })
+
     try {
         parsed = JSON.parse(chunk);
+        ({ user, isJson } = checkLoginMessage(parsed, socket));
         //if initial message is not json then it is interpreted as a name
     } catch (error) {
         userInfo = chunk.toString("utf8");
+
         if (userInfo && userInfo.length > 0) {
             user = User.createUser(userInfo, socket);
             isJson = false;
         }else{
             err = true;
         }
+        console.log("handle chunk not json", { err, chunk, userInfo });
 
     }
-    ({ user, isJson } = checkLoginMessage(parsed,socket));
     return {
         user,
         isJson,

@@ -1,225 +1,86 @@
 server start
 listenting on 3005
-timed out for message
-TCP connection { fd: 26, httpBool: false }
-IdentityGetter try
-new user { name: 'timt', id: 1, isJson: true, swId: 0, handle: 26 }
-[ { name: 'timt', sockets: [ [TCPSocketWrapper] ] } ]
-socket configured timt
-tcp socket write
-tcp socket write
-received message { msg:
-   { payload: { body: 'terminal msg', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
+TCP connection { fd: 26, httpBool: true }
 TCP connection { fd: 27, httpBool: true }
-TCP connection { fd: 29, httpBool: true }
-new user { name: 'websocket U 899',
-  id: 2,
+TCP connection { fd: 28, httpBool: true }
+IdentityGetter try undefined
+TCP connection { fd: 28, httpBool: true }
+IdentityGetter try undefined
+new user { name: 'websocket U 977',
+  id: 1,
   isJson: true,
   swId: 1,
   handle: undefined }
-[ { name: 'timt', sockets: [ [TCPSocketWrapper] ] },
-  { name: 'websocket U 899', sockets: [ [WebSocketWrapper] ] } ]
-socket configured websocket U 899
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"LOGIN","action":"POST","payload":{"userName":"websocket U 899","channels":[{"name":"all","id":0}]}}' }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 899","isNew":false}}' }
-timed out for message
-TCP connection { fd: 28, httpBool: false }
-IdentityGetter try
-TCP connection { fd: 29, httpBool: true }
-new user { name: 'websocket U 498',
+[ { name: 'websocket U 977', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 977
+TCP connection { fd: 28, httpBool: true }
+IdentityGetter try undefined
+new user { name: 'websocket U 186',
+  id: 2,
+  isJson: true,
+  swId: 2,
+  handle: undefined }
+[ { name: 'websocket U 977', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 186', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 186
+ws on data { m:
+   '{"payload":{"body":"sfsf","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
+  type: 'string' }
+received message { msg:
+   { payload: { body: 'sfsf', destination: [Object] },
+     type: 'TEXT_MESSAGE',
+     action: 'POST' } }
+web socket identity timeout
+websocket json parse error { msg: undefined }
+bailed out of identity getter
+TCP connection { fd: 26, httpBool: true }
+TCP connection { fd: 26, httpBool: true }
+TCP connection { fd: 28, httpBool: true }
+IdentityGetter try undefined
+new user { name: 'websocket U 63',
   id: 3,
   isJson: true,
   swId: 3,
   handle: undefined }
-[ { name: 'timt', sockets: [ [TCPSocketWrapper] ] },
-  { name: 'websocket U 899', sockets: [ [WebSocketWrapper] ] },
-  { name: 'websocket U 498', sockets: [ [WebSocketWrapper] ] } ]
-socket configured websocket U 498
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"LOGIN","action":"POST","payload":{"userName":"websocket U 498","channels":[{"name":"all","id":0}]}}' }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 498","isNew":false}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 498","isNew":false}}' }
-TCP connection { fd: 30, httpBool: true }
-new user { name: 'websocket U 412',
-  id: 4,
-  isJson: true,
-  swId: 4,
-  handle: undefined }
-[ { name: 'timt', sockets: [ [TCPSocketWrapper] ] },
-  { name: 'websocket U 899', sockets: [ [WebSocketWrapper] ] },
-  { name: 'websocket U 498', sockets: [ [WebSocketWrapper] ] },
-  { name: 'websocket U 412', sockets: [ [WebSocketWrapper] ] } ]
-socket configured websocket U 412
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"LOGIN","action":"POST","payload":{"userName":"websocket U 412","channels":[{"name":"all","id":0}]}}' }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 412","isNew":false}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 412","isNew":false}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"all","userThatJoined":"websocket U 412","isNew":false}}' }
-ws on data { m:
-   '{"payload":{"body":"a","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { body: 'a', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
+[ { name: 'websocket U 977', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 186', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 63', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 63
+peak http:timed out for message
+TCP connection { fd: 27, httpBool: false }
+IdentityGetter try { fd: 27 }
 error getting identity message timeout
 bailed out of identity getter
-ws on data { m:
-   '{"payload":{"body":"b","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { body: 'b', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-received message { msg:
-   { payload: { body: 'c', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"c","from":{"name":"timt","id":1}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"c","from":{"name":"timt","id":1}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"c","from":{"name":"timt","id":1}}}' }
-received message { msg:
-   { payload: { channelName: 'nc', switchTo: true },
-     type: 'CHANNEL_COMMAND',
-     action: 'POST' } }
-hi cc
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"nc","userThatJoined":"timt","isNew":true}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"nc","userThatJoined":"timt","isNew":true}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"nc","userThatJoined":"timt","isNew":true}}' }
-received message { msg:
-   { payload: { body: 'c', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
-ws on data { m:
-   '{"payload":{"body":"b","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { body: 'b', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-ws on data { m:
-   '{"payload":{"body":"a","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { body: 'a', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
-ws on data { m:
-   '{"payload":{"channelName":"nc","switchTo":true},"type":"CHANNEL_COMMAND","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { channelName: 'nc', switchTo: true },
-     type: 'CHANNEL_COMMAND',
-     action: 'POST' } }
-hi cc
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"CHANNEL_COMMAND","action":"POST","payload":{"channelName":"nc","userThatJoined":"websocket U 498","isNew":false}}' }
-ws on data { m:
-   '{"payload":{"body":"a","destination":{"type":"CHANNEL","val":"nc"}},"type":"TEXT_MESSAGE","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { body: 'a', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"a","from":{"name":"websocket U 498","id":3}}}' }
-ws on data { m:
-   '{"payload":{"body":"b","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
-  type: 'string' }
-received message { msg:
-   { payload: { body: 'b', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"b","from":{"name":"websocket U 412","id":4}}}' }
-received message { msg:
-   { payload: { body: 'c', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-tcp socket write
-write to websocket { websocketMessageEventName: 'data',
-  msg:
-   '{"isResponse":true,"type":"TEXT_MESSAGE","action":"POST","payload":{"body":"c","from":{"name":"timt","id":1}}}' }
+TCP connection { fd: 26, httpBool: true }
+TCP connection { fd: 28, httpBool: true }
+IdentityGetter try undefined
+new user { name: 'websocket U 220',
+  id: 4,
+  isJson: true,
+  swId: 5,
+  handle: undefined }
+[ { name: 'websocket U 977', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 186', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 63', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 220', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 220
+peak http:timed out for message
+TCP connection { fd: 27, httpBool: false }
+IdentityGetter try { fd: 27 }
+error getting identity message timeout
+bailed out of identity getter
+TCP connection { fd: 26, httpBool: true }
+TCP connection { fd: 27, httpBool: true }
+TCP connection { fd: 28, httpBool: true }
+IdentityGetter try undefined
+new user { name: 'websocket U 160',
+  id: 5,
+  isJson: true,
+  swId: 7,
+  handle: undefined }
+[ { name: 'websocket U 977', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 186', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 63', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 220', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 160', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 160
