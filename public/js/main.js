@@ -42205,19 +42205,19 @@ module.exports = yeast;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-let i = 0;
-exports.StreamAwaiter = () => {
-    const checkers = {};
-    return ({
-        waitFor: (checker, timeoutTime = 1000) => new Promise((resolve, rej) => {
-            checkers[i++] = { checker, resolve, rej, setTime: Date.now(), timeoutTime };
-        }),
-        onData: (parsed) => {
-            const checkerArr = Object.entries(checkers);
+class StreamAwaiter {
+    constructor() {
+        this.checkers = {};
+        this.i = 0;
+        this.waitFor = (checker, timeoutTime = undefined) => new Promise((resolve, rej) => {
+            this.checkers[this.i++] = { checker, resolve, rej, setTime: Date.now(), timeoutTime };
+        });
+        this.onData = (parsed) => {
+            const checkerArr = Object.entries(this.checkers);
             if (checkerArr.length > 0) {
                 checkerArr.forEach(([key, checkerWrapper]) => {
                     if (checkerWrapper.checker(parsed)) {
-                        delete checkers[key];
+                        delete this.checkers[key];
                         checkerWrapper.resolve(parsed);
                     }
                     else {
@@ -42227,9 +42227,10 @@ exports.StreamAwaiter = () => {
                     }
                 });
             }
-        }
-    });
-};
+        };
+    }
+}
+exports.StreamAwaiter = StreamAwaiter;
 
 
 /***/ }),
@@ -42243,6 +42244,15 @@ exports.StreamAwaiter = () => {
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -42263,6 +42273,7 @@ const message_1 = __webpack_require__(/*! ../../lib/messages/message */ "./src/l
 const streamAwaiter_1 = __webpack_require__(/*! ../tcpClient/streamAwaiter */ "./src/clients/tcpClient/streamAwaiter.ts");
 const socket_1 = __webpack_require__(/*! ../../lib/store/sockets/socket */ "./src/lib/store/sockets/socket.ts");
 const newline_1 = __webpack_require__(/*! ../../lib/util/newline */ "./src/lib/util/newline.ts");
+const rtcHandler_1 = __webpack_require__(/*! ./rtcHandler */ "./src/clients/webReact/rtcHandler.ts");
 const Hello = (props) => (React.createElement("section", null,
     React.createElement(SocketComponent, null)));
 console.log({ websocketMessageEventName: socket_1.websocketMessageEventName });
@@ -42280,11 +42291,13 @@ class SocketComponent extends React.Component {
             channels: [],
             currentChannel: null,
             auth: false,
-            userName: "websocket U " + Date.now() % 1000
+            userName: "websocket U " + Date.now() % 1000,
+            PC: null,
+            localStream: null
         };
-        this.streamAwaiter = streamAwaiter_1.StreamAwaiter();
+        this.streamAwaiter = new streamAwaiter_1.StreamAwaiter();
         this.sendToServer = (socket, msg, checker = null) => {
-            console.log("sending to server", { msg });
+            // console.log("sending to server", { msg });
             const str = JSON.stringify(msg);
             socket.emit(socket_1.websocketMessageEventName, str);
             if (checker) {
@@ -42294,7 +42307,7 @@ class SocketComponent extends React.Component {
                 return null;
             }
         };
-        this.configureSocket = () => {
+        this.configureSocket = () => new Promise((r) => {
             const socket = socket_io_client_1.default("localhost:3005", {
                 transports: ['websocket']
             });
@@ -42302,21 +42315,19 @@ class SocketComponent extends React.Component {
             socket.on("error", (e) => { console.log("error", { e }); });
             socket.on("connect_error", (e) => { console.log("connect_error", { e }); });
             socket.on("connect_timeout", (e) => { console.log("connect_timeout", { e }); });
-            socket.on("reconnect_attempt", (e) => {
-                console.log("reconnect_attempt", new Date().getMinutes(), { e });
-                this.setState({ auth: false });
-            });
+            socket.on("reconnect_attempt", (e) => { console.log("reconnect_attempt", new Date().getMinutes(), { e }); this.setState({ auth: false }); });
             socket.on("reconnect", (e) => console.log("reconnect"));
             socket.on("reconnecting", (e) => { console.log("reconnecting", new Date().getMinutes(), { e }); });
             socket.on("reconnect_error", (e) => { console.log("reconnect_error", new Date().getMinutes(), { e }); });
             socket.on("reconnect_failed", (e) => { console.log("reconnect_failed", new Date().getMinutes(), { e }); });
             socket.on("dissconnect", (e) => { console.log("dissconnect", { e }); });
             socket.on("connect", (e) => {
-                this.login(this.state.socket);
+                this.login(this.state.socket)
+                    .then(() => r());
                 console.log("connect", new Date().getMinutes(), { e });
             });
             socket.on(socket_1.websocketMessageEventName, (msg) => {
-                console.log("recieved", { msg });
+                // console.log("recieved", { msg });
                 if (typeof msg === 'string') {
                     try {
                         msg = JSON.parse(msg);
@@ -42331,18 +42342,89 @@ class SocketComponent extends React.Component {
                             msgs: [...this.state.msgs, `${newline_1.newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
                         });
                     }
-                    if (isChannelPostResponse(msg) && msg.payload.channelName !== this.state.currentChannel) {
+                    if (isChannelPostResponse(msg) && msg.payload.channelName) {
                         msg = msg;
+                        const channelName = msg.payload.channelName;
+                        const userThatJoined = msg.payload.userThatJoined;
+                        const displayName = userThatJoined === this.state.userName ? "You" : userThatJoined;
+                        let channels = this.state.channels;
+                        if (!this.state.channels.some(c => c === channelName)) {
+                            channels = [...this.state.channels, msg.payload.channelName];
+                        }
                         this.setState({
-                            msgs: [...this.state.msgs, `${msg.payload.userThatJoined} joined ${msg.payload.channelName}`],
-                            channels: [...this.state.channels, msg.payload.channelName]
+                            msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
+                            channels
                         });
                     }
                 }
                 this.streamAwaiter.onData(msg);
             });
-            return socket;
+        });
+        this.startLocalVideo = (stream) => {
+            console.log('start local video', { stream });
+            const video = this.videoWebCamRefLoc.current;
+            if (video && !video.srcObject) {
+                video.srcObject = stream;
+            }
         };
+        this.getVideoStream = () => {
+            if (this.state.localStream) {
+                return this.state.localStream;
+            }
+            else {
+                return navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(s => {
+                    console.log({ s });
+                    this.setState({ localStream: s });
+                    return s;
+                });
+            }
+        };
+        this.startRTC = () => {
+            const that = this;
+            const PC = rtcHandler_1.newRTCConnection(that.state.userName, this.getVideoStream, that.streamAwaiter)((msg, checker) => that.sendToServer(that.state.socket, msg, checker), that.state.currentChannel, (e) => {
+                console.log("on track callback");
+                const forVideo = that.videoWebCamRefFor.current;
+                if (forVideo.srcObject)
+                    console.warn("foreign video already exists for this video el");
+                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+                    console.log("got track", { e, forVideo });
+                    forVideo.srcObject = e.streams[0];
+                    forVideo.play().then(p => console.log("playing", { p })).catch((error) => {
+                        console.log({ error });
+                    });
+                    this.startLocalVideo(yield that.getVideoStream());
+                }), 1500);
+            });
+            that.setState({ PC });
+        };
+        this.startVideoChat = () => __awaiter(this, void 0, void 0, function* () {
+            console.log("start video chat");
+            this.startLocalVideo(yield this.state.PC.startStream());
+        });
+        this.render = () => (React.createElement("section", { className: "top" },
+            "current channel:",
+            this.state.currentChannel,
+            "username:",
+            this.state.userName,
+            React.createElement("button", { onClick: () => this.startVideoChat() }, "vc"),
+            React.createElement("div", { className: "flex-row" },
+                console.log(this.state),
+                React.createElement("div", { className: "channelBox" },
+                    React.createElement("div", null, "channels"),
+                    React.createElement("div", null, this.state.channels.map(c => (React.createElement("div", { onClick: () => this.createChannelPostMessage(c) }, c))))),
+                React.createElement("div", { className: "messageBox flex-column" },
+                    React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m))),
+                    React.createElement("div", { className: "messageBox-input flex-row" },
+                        React.createElement("input", { placeholder: "Enter Message", value: this.state.msg, onChange: (e) => this.setState({ msg: e.target.value }) }),
+                        React.createElement("button", { onClick: () => this.createTextmessage() })))),
+            React.createElement("div", { className: "flex-row" },
+                React.createElement("div", null,
+                    React.createElement("label", { className: "flex-column" }, "local"),
+                    React.createElement("video", { autoPlay: true, ref: this.videoWebCamRefLoc, id: "videoElementLoc" })),
+                React.createElement("div", { className: "flex-column" },
+                    React.createElement("label", null, "foreign"),
+                    React.createElement("video", { autoPlay: true, ref: this.videoWebCamRefFor, id: "videoElementFor", controls: true })))));
         this.login = (socket) => this.sendToServer(socket, new messages_1.UserPostRequest({ userName: this.state.userName }), m => isLoginResponse(m)).then(msg => this.setState({
             auth: true,
             channels: msg.payload.channels.map(c => c.name),
@@ -42377,36 +42459,20 @@ class SocketComponent extends React.Component {
                 msg: ""
             }));
         };
-        this.render = () => (React.createElement("section", { className: "top" },
-            "current channel:",
-            this.state.currentChannel,
-            React.createElement("div", { className: "flex-row" },
-                console.log(this.state),
-                React.createElement("div", { className: "channelBox" },
-                    React.createElement("div", null, "channels"),
-                    React.createElement("div", null, this.state.channels.map(c => (React.createElement("div", { onClick: () => this.createChannelPostMessage(c) }, c))))),
-                React.createElement("div", { className: "messageBox flex-column" },
-                    React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m))),
-                    React.createElement("div", { className: "messageBox-input flex-row" },
-                        React.createElement("input", { placeholder: "Enter Message", value: this.state.msg, onChange: (e) => this.setState({ msg: e.target.value }) }),
-                        React.createElement("button", { onClick: () => this.createTextmessage() })))),
-            React.createElement("div", null,
-                React.createElement("video", { autoPlay: true, ref: this.videoWebCamRef, id: "videoElement" }))));
-        this.videoWebCamRef = React.createRef();
+        this.videoWebCamRefLoc = React.createRef();
+        this.videoWebCamRefFor = React.createRef();
     }
     componentDidMount() {
-        this.configureSocket();
-        if (navigator.mediaDevices.getUserMedia) {
-            const video = this.videoWebCamRef.current;
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function (stream) {
-                video.srcObject = stream;
-                console.log({ stream });
+        const that = this;
+        setTimeout(() => {
+            this.configureSocket()
+                .then(() => {
+                that.startRTC();
             })
-                .catch(function (err0r) {
-                console.log("Something went wrong!");
+                .catch(function (e) {
+                console.log("Something went wrong!", { e });
             });
-        }
+        });
     }
 }
 document.addEventListener("DOMContentLoaded", () => {
@@ -42443,6 +42509,150 @@ if (content.locals) {
 
 /***/ }),
 
+/***/ "./src/clients/webReact/rtcHandler.ts":
+/*!********************************************!*\
+  !*** ./src/clients/webReact/rtcHandler.ts ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const messages_1 = __webpack_require__(/*! ../../lib/messages/messages */ "./src/lib/messages/messages.ts");
+const configuration = {
+    iceServers: [{
+            urls: 'stun:stun.l.google.com:19302' // Google's public STUN server
+        }]
+};
+const waitForIce = (streamAwaiter, PC, forCandidates, username) => {
+    console.log("wait for ice");
+    streamAwaiter.waitFor(m => {
+        if (m.payload.candidate && m.payload.from !== username) {
+            console.log("got ice", { m });
+            return true;
+        }
+    }).then(ice => {
+        const candidate = ice.payload.candidate;
+        if (candidate) {
+            if (PC.remoteDescription) {
+                console.log("adding candidate", { candidate });
+                if (PC.iceGatheringState !== "complete") {
+                    PC.addIceCandidate(candidate);
+                }
+            }
+            else {
+                forCandidates.push(candidate);
+            }
+        }
+        waitForIce(streamAwaiter, PC, forCandidates, username);
+    }).catch(e => console.log("receive offer went wront", { e }));
+};
+const waitForRTCOffer = (streamAwaiter, PC, forCandidates, username, startOffering, sendMessageToTargetClient) => {
+    streamAwaiter.waitFor(m => {
+        if (m.payload.description && !m.isResponse && m.payload.from !== username) {
+            console.log("got offer");
+            return true;
+        }
+    }).then((msg) => __awaiter(void 0, void 0, void 0, function* () {
+        console.log("on recieve offer create answer", { cs: PC.signalingState, PC, msg });
+        yield PC.setRemoteDescription(msg.payload.description);
+        if (forCandidates.length > 0 && PC.iceGatheringState !== "completed") {
+            forCandidates.forEach(c => {
+                console.log("receiveOffer - adding candidates", { c });
+                PC.addIceCandidate(c);
+            });
+        }
+        const ans = yield PC.createAnswer();
+        console.log("receiveOffer - set local desc ", { cs: PC.signalingState, PC, msg, ld: PC.localDescription });
+        yield PC.setLocalDescription(ans);
+        const res = new messages_1.WebRTCAnswerStream(msg, { username }, PC.localDescription);
+        console.log("sending answer", { res });
+        sendMessageToTargetClient(res);
+        startOffering();
+        // waitForRTCOffer(streamAwaiter,PC, forCandidates, username, sendMessageToTargetClient);
+    })).catch(e => console.log("receive offer went wront", { e }));
+};
+const onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
+    if (candidate) {
+        console.log("on ice candidate", { candidate });
+        sendMessageToTargetClient(new messages_1.WebRTCIceCandidate({
+            channel,
+            candidate,
+            from: username
+        }));
+    }
+};
+const onnegotiationneeded = (sendMessageToTargetClient, PC, channel, username) => () => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("onnegotiationneeded, try send offer");
+    try {
+        PC.createOffer()
+            .then(offer => {
+            console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
+            return PC.setLocalDescription(offer);
+        })
+            .then(() => {
+            console.log("send offer", { PC, ld: PC.localDescription });
+            return sendMessageToTargetClient(new messages_1.WebRTCOfferStream({
+                channel,
+                from: username,
+                description: PC.localDescription
+            }), (msg) => msg.isResponse &&
+                msg.payload.description &&
+                msg.payload.answerFrom !== username);
+        })
+            .then((answer) => {
+            console.log("received answer", { answer, cs: PC.signalingState });
+            PC.setRemoteDescription(answer.payload.description);
+        });
+    }
+    catch (error) {
+        console.error({ error });
+    }
+});
+exports.newRTCConnection = (username, getVideoStream, streamAwaiter) => {
+    const forCandidates = [];
+    return (sendMessageToTargetClient, channel, onTrackReceived) => {
+        const PC = new RTCPeerConnection(configuration);
+        let isInitiator = false;
+        const startOffering = () => __awaiter(void 0, void 0, void 0, function* () {
+            if (!isInitiator) {
+                const stream = yield getVideoStream();
+                stream.getTracks().forEach((track) => PC.addTrack(track, stream));
+                return stream;
+            }
+        });
+        PC.onicecandidate = onicecandidate(sendMessageToTargetClient, username, channel);
+        PC.onnegotiationneeded = onnegotiationneeded(sendMessageToTargetClient, PC, channel, username);
+        PC.ontrack = (e) => {
+            console.log("on track", { cs: PC.signalingState, e });
+            onTrackReceived(e);
+        };
+        waitForIce(streamAwaiter, PC, forCandidates, username);
+        waitForRTCOffer(streamAwaiter, PC, forCandidates, username, startOffering, sendMessageToTargetClient);
+        return {
+            PC,
+            startStream: () => __awaiter(void 0, void 0, void 0, function* () {
+                const stream = yield startOffering();
+                isInitiator = true;
+                return stream;
+            })
+        };
+    };
+};
+
+
+/***/ }),
+
 /***/ "./src/lib/messages/message.ts":
 /*!*************************************!*\
   !*** ./src/lib/messages/message.ts ***!
@@ -42459,12 +42669,15 @@ var ActionTypes;
     ActionTypes["patch"] = "PATCH";
     ActionTypes["get"] = "GET";
     ActionTypes["delete"] = "DELETE";
+    ActionTypes["offer"] = "OFFER";
+    ActionTypes["meta"] = "META";
 })(ActionTypes = exports.ActionTypes || (exports.ActionTypes = {}));
 var MessageTypes;
 (function (MessageTypes) {
     MessageTypes["textMessage"] = "TEXT_MESSAGE";
     MessageTypes["channelCommand"] = "CHANNEL_COMMAND";
     MessageTypes["login"] = "LOGIN";
+    MessageTypes["WRTCAV"] = "WebRTC-AV";
 })(MessageTypes = exports.MessageTypes || (exports.MessageTypes = {}));
 var DestinationTypes;
 (function (DestinationTypes) {
@@ -42570,6 +42783,34 @@ class ChannelGetResponse extends message_1.Response {
     }
 }
 exports.ChannelGetResponse = ChannelGetResponse;
+class WebRTCIceCandidate {
+    constructor(payload) {
+        this.payload = payload;
+        this.type = message_1.MessageTypes.WRTCAV;
+        this.action = message_1.ActionTypes.meta;
+    }
+}
+exports.WebRTCIceCandidate = WebRTCIceCandidate;
+class WebRTCOfferStream {
+    constructor(payload) {
+        this.payload = payload;
+        this.type = message_1.MessageTypes.WRTCAV;
+        this.action = message_1.ActionTypes.offer;
+    }
+}
+exports.WebRTCOfferStream = WebRTCOfferStream;
+class WebRTCAnswerStream extends message_1.Response {
+    constructor(msg, user, desc, payload = {
+        description: desc,
+        channel: msg.payload.channel,
+        offerFrom: msg.payload.from,
+        answerFrom: user.username
+    }) {
+        super(msg);
+        this.payload = payload;
+    }
+}
+exports.WebRTCAnswerStream = WebRTCAnswerStream;
 
 
 /***/ }),

@@ -1,14 +1,17 @@
 
-export enum ActionTypes {
+export enum ActionTypes{
     post = "POST",
     patch = "PATCH",
     get = "GET",
     delete = "DELETE",
+    offer = "OFFER",
+    meta = "META"
 }
 export enum MessageTypes {
     textMessage = "TEXT_MESSAGE",
     channelCommand = "CHANNEL_COMMAND",
-    login = "LOGIN"
+    login = "LOGIN",
+    WRTCAV = "WebRTC-AV"
 }
 export enum DestinationTypes {
     channel = "CHANNEL",

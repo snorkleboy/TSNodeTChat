@@ -5,7 +5,9 @@ export type HandledRequests =
     | TextMessagePostRequest
     | ChannelPostRequest
     | ChannelGetRequest
-export type HandledResponses = TextMessagePostResponse | ChannelPostResponse;
+    | WebRTCIceCandidate
+    | WebRTCOfferStream
+export type HandledResponses = TextMessagePostResponse | ChannelPostResponse | WebRTCAnswerStream;
 
 
 
@@ -71,3 +73,32 @@ export class ChannelGetResponse extends Response<ChannelGetRequest> {
         channels: Store.getStore().channels.getList()
     }) { super(msg) }
 }
+
+
+export class WebRTCIceCandidate implements Request {
+    type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
+    action: ActionTypes.meta = ActionTypes.meta
+    constructor(public payload: {
+        candidate: any,
+        channel:string,
+        from:string
+    }) { }
+}
+export class WebRTCOfferStream implements Request{
+    type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
+    action: ActionTypes.offer = ActionTypes.offer
+    constructor(public payload : {
+        channel:string,
+        description:any,
+        from:string
+    }) { }
+}
+export class WebRTCAnswerStream extends Response<WebRTCOfferStream> {
+    constructor(msg: WebRTCOfferStream, user:{username:string},desc: any, public payload = {
+        description: desc,
+        channel: msg.payload.channel,
+        offerFrom:msg.payload.from,
+        answerFrom:user.username
+    }) { super(msg) }
+}
+

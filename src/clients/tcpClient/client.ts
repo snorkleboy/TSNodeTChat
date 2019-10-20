@@ -49,7 +49,7 @@ type setIdentity = ({useName:string})=>Promise<{id:number,channels:Array<any>}>
 
 
 class Client{
-    protected streamAwaiter = StreamAwaiter();
+    protected streamAwaiter =new StreamAwaiter();
     private publicCommands: PublicCommands = commandsMaker(this);
     private stdIn = process.openStdin();
     public state: ComponentState  = {

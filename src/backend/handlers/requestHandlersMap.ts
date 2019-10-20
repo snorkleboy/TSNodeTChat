@@ -4,6 +4,20 @@ import { TextMessagePostResponse, ChannelPostResponse, ChannelGetResponse } from
 import { Channel } from "../../lib/store/channel/channel";
 import { Store } from "../../lib/store/store";
 export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
+    [MessageTypes.WRTCAV]:{
+        [ActionTypes.offer]: (message, store, user)=>{
+            const channel = user.channels.getByName(message.payload.channel);
+            if(channel){
+                channel.forEachUser(u=>u.writeToAllSockets(message))
+            }
+        },
+        [ActionTypes.meta]: (message, store, user)=>{
+            const channel = user.channels.getByName(message.payload.channel);
+            if(channel){
+                channel.forEachUser(u=>u.writeToAllSockets(message))
+            }
+        }
+    },
     [MessageTypes.textMessage]: {
         [ActionTypes.post]: (message, store, user) => {
             const { destination, body } = message.payload;
