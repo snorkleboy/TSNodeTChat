@@ -81,6 +81,7 @@ export class WebRTCIceCandidate implements Request {
     constructor(public payload: {
         candidate: any,
         channel:string,
+        to:string,
         from:string
     }) { }
 }

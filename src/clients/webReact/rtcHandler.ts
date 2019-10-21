@@ -7,126 +7,228 @@ const configuration = {
     }]
 };
 
-const waitForIce = (streamAwaiter: StreamAwaiter,PC, forCandidates: Array<any>, username: string ) => {
-    console.log("wait for ice");
-    streamAwaiter.waitFor<WebRTCIceCandidate>(m => {
-        if ((m as WebRTCIceCandidate).payload.candidate && (m as WebRTCIceCandidate).payload.from !== username) {
-            console.log("got ice", { m });
-            return true;
-        }
-    }).then(ice => {
-        const candidate = ice.payload.candidate;
-        if (candidate) {
-            if (PC.remoteDescription) {
-                console.log("adding candidate", { candidate });
-                if (PC.iceGatheringState !== "complete"){
-                    PC.addIceCandidate(candidate);
-                }
-            }else{
-                forCandidates.push(candidate);
-            }
-        }
-        waitForIce(streamAwaiter,PC, forCandidates, username);
-    }).catch(e => console.log("receive offer went wront", { e }));
-}
 
-const waitForRTCOffer = (streamAwaiter: StreamAwaiter,PC, forCandidates: Array<any>, username: string,startOffering, sendMessageToTargetClient: Function) => {
-    streamAwaiter.waitFor<WebRTCOfferStream>(m => {
-        if ((m as WebRTCOfferStream).payload.description && !(m as any).isResponse && (m as WebRTCOfferStream).payload.from !== username) {
-            console.log("got offer");
-            return true;
+export class RTCClient{
+    forCandidates = [];
+    PC = null;
+    isInitiator = false;
+    receivedOffer = false;
+    offering=false;
+    public partner = null;
+    constructor(
+        public username:string,
+        public channel: String,
+        public streamAwaiter: StreamAwaiter,
+        public getVideoStream,
+        public sendMessageToTargetClient,
+        public onTrackReceived,
+        public onExtraPartner = null,
+        public onPartner = null
+    ){
+        this.PC = new RTCPeerConnection(configuration);
+        this.PC.onicecandidate = this.onicecandidate(sendMessageToTargetClient, username, channel).bind(this);
+        this.PC.onnegotiationneeded = this.onnegotiationneeded(sendMessageToTargetClient, this.PC, channel, username);
+
+        this.PC.ontrack = (e) => {
+            console.log("PC.ontrack", { this: this, cs: this.PC.iceGatheringState, e })
+            if (this.forCandidates.length > 0 && this.PC.iceGatheringState !== "completed") {
+                this.forCandidates.forEach(c => {
+                    console.log("receiveOffer - adding candidates", { c });
+                    this.PC.addIceCandidate(c)
+                });
+            }
+            onTrackReceived(e,this.partner);
         }
-    }).then(async msg => {
-        console.log("on recieve offer create answer", { cs: PC.signalingState, PC, msg });
+        this.waitForIce(streamAwaiter, this.PC, this.forCandidates, username);
+        // this.waitForRTCOffer(streamAwaiter, this.PC, this.forCandidates, username, this.startOffering, sendMessageToTargetClient);
+    }
+    protected startOffering = async () => {
+        if (!this.isInitiator && !this.offering) {
+            const stream = await this.getVideoStream();
+            this.offering = true;
+            stream.getTracks().forEach((track) => this.PC.addTrack(track, stream))
+            return stream;
+        }
+    }
+    
+    startStream = async (onPartner = null) => {
+        const stream = await this.startOffering()
+        if (onPartner){
+            this.onPartner = onPartner;
+        }
+        this.isInitiator = true;
+        return stream;
+    }
+    waitForIce = (streamAwaiter: StreamAwaiter, PC, forCandidates: Array<any>, username: string) => {
+        console.log("wait for ice",this);
+        streamAwaiter.waitFor<WebRTCIceCandidate>(m => {
+            if (
+                (m as WebRTCIceCandidate).payload.candidate && 
+                (m as WebRTCIceCandidate).payload.to === this.username &&
+                (m as WebRTCIceCandidate).payload.from === this.partner
+            ) {
+                console.log("candidate", { m, this: this, partner: this.partner }, (m as WebRTCIceCandidate).payload.candidate && (m as WebRTCIceCandidate).payload.from === this.partner);
+                return true;
+            }
+        }).then(ice => {
+            console.log("got ice", { ice}, this);
+            const candidate = ice.payload.candidate;
+            if (candidate) {
+                if (PC.remoteDescription) {
+                    console.log("adding candidate", { candidate },this);
+                    if (PC.iceGatheringState !== "complete") {
+                        // this.forCandidates.push(candidate);
+                        PC.addIceCandidate(candidate);
+                    }
+                } else {
+                    forCandidates.push(candidate);
+                }
+            }
+            this.waitForIce(streamAwaiter, PC, forCandidates, username);
+        }).catch(e => console.log("receive offer went wront", { e }));
+    }
+
+    onOffer = async (msg:WebRTCOfferStream) => {
+        if (msg.payload.from === this.partner && this.receivedOffer === true){
+            console.log("swallow reciegd offer",{msg,this:this})
+            return;
+        }
+        this.partner = msg.payload.from;
+        this.receivedOffer = true;
+        const PC = this.PC;
+        console.log("on recieve offer create answer",this, { cs: PC.signalingState, PC, msg });
         await PC.setRemoteDescription(msg.payload.description);
-        if (forCandidates.length > 0 && PC.iceGatheringState !== "completed") {
-            forCandidates.forEach(c => {
-                console.log("receiveOffer - adding candidates", { c });
+        if (this.forCandidates.length > 0 && PC.iceGatheringState !== "completed") {
+            console.log("receiveOffer - adding candidates");
+
+            this.forCandidates.forEach(c => {
                 PC.addIceCandidate(c)
             });
         }
         const ans = await PC.createAnswer()
-        console.log("receiveOffer - set local desc ", { cs: PC.signalingState, PC, msg, ld: PC.localDescription });
         await PC.setLocalDescription(ans);
+        const username = this.username;
         const res = new WebRTCAnswerStream(msg, { username }, PC.localDescription);
         console.log("sending answer", { res });
-        sendMessageToTargetClient(res);
-        startOffering();
-        // waitForRTCOffer(streamAwaiter,PC, forCandidates, username, sendMessageToTargetClient);
-    }).catch(e => console.log("receive offer went wront", { e }));
-}
-const onicecandidate = (sendMessageToTargetClient, username, channel)=>({ candidate }) => {
-    if (candidate) {
-        console.log("on ice candidate", { candidate });
-        sendMessageToTargetClient(new WebRTCIceCandidate({
-            channel,
-            candidate,
-            from: username
-        }));
+        this.sendMessageToTargetClient(res);
+        this.startOffering();
     }
+    onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
+        if (candidate) {
+            sendMessageToTargetClient(new WebRTCIceCandidate({
+                channel,
+                candidate,
+                from: username,
+                to:this.partner
+            }));
+        }
 
-}
-const onnegotiationneeded = (sendMessageToTargetClient, PC,channel,username)=> async () => {
-    console.log("onnegotiationneeded, try send offer");
-    try {
-        PC.createOffer()
-            .then(offer => {
-                console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
-                return PC.setLocalDescription(offer);
-            })
-            .then(() => {
-                console.log("send offer", { PC, ld: PC.localDescription });
-                return sendMessageToTargetClient(
-                    new WebRTCOfferStream({
-                        channel,
-                        from: username,
-                        description: PC.localDescription
-                    }),
-                    (msg) => (msg as WebRTCAnswerStream).isResponse && 
-                        (msg as WebRTCAnswerStream).payload.description && 
-                        (msg as WebRTCAnswerStream).payload.answerFrom !== username
-                )
-            })
-            .then((answer) => {
+    }
+    onnegotiationneeded = (sendMessageToTargetClient, PC, channel, username) => async () => {
+        console.log("onnegotiationneeded, try send offer",this);
+        const waitForAnswer = ()=>{
+            this.streamAwaiter.waitFor((msg) => (msg as WebRTCAnswerStream).isResponse &&
+                (msg as WebRTCAnswerStream).payload.description &&
+                (msg as WebRTCAnswerStream).payload.offerFrom === username &&
+                (!this.partner || (this.partner && (msg as WebRTCAnswerStream).payload.answerFrom === this.partner))
+            ).then((answer: WebRTCAnswerStream) => {
+                let ret;
                 console.log("received answer", { answer, cs: PC.signalingState });
-                PC.setRemoteDescription(answer.payload.description)
+                if (this.partner && this.partner !== answer.payload.answerFrom) {
+                    console.log("extra partner going back to manager", this, answer);
+                    ret =  setTimeout(()=>{
+                        this.onExtraPartner(answer);
+                    },1500)
+                } else {
+                    console.log("answer negotation parter", { this: this, answer });
+                    this.partner = answer.payload.answerFrom;
+                    if (this.onPartner) {
+                        this.onPartner(this.partner, answer);
+                    }
+                    ret = PC.setRemoteDescription(answer.payload.description);
+                }
+                waitForAnswer();
+                return ret;
             })
+        }
+        try {
+            PC.createOffer()
+                .then(offer => {
+                    console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
+                    return PC.setLocalDescription(offer);
+                })
+                .then(() => {
+                    console.log("send offer",this, { PC, ld: PC.localDescription });
+                    
+                    sendMessageToTargetClient(
+                        new WebRTCOfferStream({
+                            channel,
+                            from: username,
+                            description: PC.localDescription
+                        })
+                    )
+                    return waitForAnswer();
+                })
+                
 
-    } catch (error) {
-        console.error({ error });
+        } catch (error) {
+            console.error({ error });
+        }
+
+    };
+}
+
+export class RTCClientManager  {
+    connections = {
+
+    };
+    initiator = null
+    constructor(
+        public username: string,
+        public getChannel,
+        public streamAwaiter: StreamAwaiter,
+        public getVideoStream,
+        public sendMessageToTargetClient,
+        public onTrackReceived,
+    ){
+        this.waitForRTCOffer();
     }
-
-};
-export const newRTCConnection = (username,getVideoStream,streamAwaiter) => {
-    const forCandidates = [];
-    return (sendMessageToTargetClient, channel, onTrackReceived) => {//sendMessageToTargetClient,onGetStream,onTrySendStream
-        const PC = new RTCPeerConnection(configuration);
-        let isInitiator = false;
-        const startOffering = async ()=>{
-            if(!isInitiator){
-                const stream = await getVideoStream()
-                stream.getTracks().forEach((track) => PC.addTrack(track, stream))
-                return stream;
+    private waitForRTCOffer = () => {
+        const that = this;
+        this.streamAwaiter.waitFor<WebRTCOfferStream>(m => {
+            if ((m as WebRTCOfferStream).payload.description && !(m as any).isResponse && (m as WebRTCOfferStream).payload.from !== this.username) {
+                return true;
             }
-            
-        }
-        PC.onicecandidate = onicecandidate(sendMessageToTargetClient, username, channel);
-        PC.onnegotiationneeded = onnegotiationneeded(sendMessageToTargetClient, PC, channel, username);
+        }).then(async msg => {
+            const potentialPartner = msg.payload.from;
+            this.gotPotentialPartner(potentialPartner, msg);
 
-        PC.ontrack = (e) => {
-            console.log("on track", { cs: PC.signalingState, e })
-            onTrackReceived(e);
+            that.waitForRTCOffer()
+        }).catch(e => console.log("receive offer went wront", { e }));
+    }
+    private gotPotentialPartner = (potentialPartner,msg)=>{
+        if (!this.connections[potentialPartner]) {
+            console.log("manager got new offer", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
+            const nClient = this.newConnection();
+            // nClient.partner = potentialPartner;
+            this.connections[potentialPartner] = nClient;
+        }else{
+            console.log("manager got offer for existing conection", potentialPartner, { connections: this.connections, initiator: this.initiator,potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
         }
+        this.connections[potentialPartner].onOffer(msg);
 
-        waitForIce(streamAwaiter, PC, forCandidates, username);
-        waitForRTCOffer(streamAwaiter, PC, forCandidates, username,startOffering,sendMessageToTargetClient);
-        return {
-            PC,
-            startStream:async ()=>{
-                const stream = await startOffering()
-                isInitiator = true;
-                return stream;
-            }
-        }
+    }
+    private newConnection = ()=>{
+        return new RTCClient(this.username, this.getChannel(), this.streamAwaiter, this.getVideoStream, this.sendMessageToTargetClient, this.onTrackReceived,(msg: WebRTCAnswerStream)=>{
+            const potentialPartner = msg.payload.answerFrom;
+            console.log("manager got extra answer", { connections: this.connections, initiator: this.initiator,potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
+            this.gotPotentialPartner(potentialPartner,msg);
+        });
+    }
+    start = ()=>{
+        this.initiator = this.newConnection();
+        this.initiator.startStream((p,m)=>{
+            this.connections[p] = this.initiator;
+        });
     }
 }

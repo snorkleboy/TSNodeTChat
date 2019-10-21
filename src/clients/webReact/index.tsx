@@ -8,7 +8,7 @@ import { DestinationTypes } from "../../lib/messages/message";
 import { StreamAwaiter ,StreamChecker} from "../tcpClient/streamAwaiter";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import { newLineArt } from "../../lib/util/newline";
-import { newRTCConnection} from "./rtcHandler"
+import {  RTCClientManager} from "./rtcHandler"
 
 interface HelloProps { compiler: string; framework: string; }
 const Hello = (props: HelloProps) => (
@@ -17,20 +17,28 @@ const Hello = (props: HelloProps) => (
     </section>
 )
 console.log({ websocketMessageEventName})
-interface SocketProps {
+
+interface VCState {
+    localStream: any
+    partners: { [k: string]: Partner }
+}
+interface SocketState {
     socket:Socket,
     auth:false,
     channels:Array<string>,
     currentChannel:string,
     userName:string,
     PC:any,
-    localStream:any
 }
-interface TypeingProps {
+interface TypeingState {
     msg:string
 }
 interface ReceivedMsgs{
     msgs:Array<string>
+}
+interface Partner{
+    videoWebCamRef,
+    stream
 }
 type sendToServer = {
     <Req extends HandledRequests | UserPostRequest, Res extends HandledResponses | UserPostResponse>(
@@ -50,7 +58,7 @@ const isLoginResponse = (msg:HandledResponses|UserPostResponse):msg is UserPostR
 const isResponseTo = (req: HandledRequests | UserPostRequest, res: HandledResponses | UserPostResponse, otherCheck: (r: HandledResponses | UserPostResponse)=>boolean) => !!(otherCheck(res) && res.type === req.type && res.action === req.action);
 const isTextResponse = (msg: HandledResponses | UserPostResponse):msg is TextMessagePostResponse=>!!(msg as TextMessagePostResponse).payload.body
 class SocketComponent extends React.Component {
-    state: SocketProps & TypeingProps & ReceivedMsgs = {
+    state: SocketState & TypeingState & ReceivedMsgs & VCState = {
         socket:null,
         msg:"",
         msgs:[],
@@ -59,15 +67,14 @@ class SocketComponent extends React.Component {
         auth:false,
         userName: "websocket U " + Date.now()%1000 ,
         PC:null,
-        localStream:null
+        localStream:null,
+        partners: {}
     }
     videoWebCamRefLoc
-    videoWebCamRefFor
     streamAwaiter = new StreamAwaiter();
     constructor(props){
         super(props);
         this.videoWebCamRefLoc = React.createRef();
-        this.videoWebCamRefFor = React.createRef();
 
     }
     sendToServer: sendToServer = (socket, msg, checker = null) => {
@@ -93,7 +100,18 @@ class SocketComponent extends React.Component {
         })
  
     }
-
+    componentDidUpdate(pp,ps){
+        if(ps.partners !== this.state.partners){
+            Object.entries(this.state.partners).forEach(([name,obj])=>{
+                if(!obj.videoWebCamRef.current.srcObject){
+                    obj.videoWebCamRef.current.srcObject = obj.stream;
+                    obj.videoWebCamRef.current.play().then(p => console.log("playing", { p })).catch((error) => {
+                        console.log({ name,error});
+                    });
+                }
+            })
+        }
+    }
     configureSocket = ()=>new Promise((r)=>{
 
         const socket = io("localhost:3005", {
@@ -123,31 +141,27 @@ class SocketComponent extends React.Component {
                     console.log('json parse error', { msg, error });
                 }
             }
-            if(this.state.auth){
-                if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
-                    this.setState({
-                        msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
-                    })
+            if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
+                this.setState({
+                    msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
+                })
+            }
+            if (isChannelPostResponse(msg) && (msg as ChannelPostResponse).payload.channelName) {
+                msg = msg as ChannelPostResponse;
+                const channelName = msg.payload.channelName;
+                const userThatJoined = msg.payload.userThatJoined;
+                const displayName = userThatJoined === this.state.userName? "You":userThatJoined;
+                let channels = this.state.channels
+                if (!this.state.channels.some(c=>c===channelName)){
+                    channels= [...this.state.channels, msg.payload.channelName]
                 }
-                if (isChannelPostResponse(msg) && (msg as ChannelPostResponse).payload.channelName) {
-                    msg = msg as ChannelPostResponse;
-                    const channelName = msg.payload.channelName;
-                    const userThatJoined = msg.payload.userThatJoined;
-                    const displayName = userThatJoined === this.state.userName? "You":userThatJoined;
-                    let channels = this.state.channels
-                    if (!this.state.channels.some(c=>c===channelName)){
-                        channels= [...this.state.channels, msg.payload.channelName]
-                    }
-                    this.setState({
-                        msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
-                        channels
-                    })
+                this.setState({
+                    msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
+                    channels
+                })
 
-                }
             }
             this.streamAwaiter.onData(msg);
-
-
         })
     });
     startLocalVideo = (stream) => {
@@ -159,7 +173,7 @@ class SocketComponent extends React.Component {
     }
     getVideoStream = () => {
         if(this.state.localStream){
-            return this.state.localStream;
+            return Promise.resolve(this.state.localStream);
         }else{
              return navigator.mediaDevices.getUserMedia({ video: true })
              .then(s=>{
@@ -171,30 +185,30 @@ class SocketComponent extends React.Component {
     }
     startRTC = () => {
         const that = this;
-        const PC = newRTCConnection(that.state.userName, this.getVideoStream , that.streamAwaiter)(
+        const PC = new RTCClientManager(that.state.userName, ()=>that.state.currentChannel, this.streamAwaiter,this.getVideoStream,
             (msg, checker) => that.sendToServer(that.state.socket, msg, checker),
-            that.state.currentChannel,
-            (e) => {
-                console.log("on track callback");
-                const forVideo = that.videoWebCamRefFor.current;
-                if (forVideo.srcObject) console.warn("foreign video already exists for this video el");
-                setTimeout(async ()=>{
-                    console.log("got track", { e, forVideo });
-                    forVideo.srcObject = e.streams[0];
-                    forVideo.play().then(p=>console.log("playing",{p})).catch((error)=> {
-                        console.log({error});
-                    });
-
-                    this.startLocalVideo(await that.getVideoStream());
-                },1500)
-                    
+            (e,partner) => {
+                console.log("on track callback", { e, partner, partners: this.state.partners});
+                this.getVideoStream()
+                    .then(s => this.startLocalVideo(s))
+                
+                this.setState({
+                    partners:{
+                        ...this.state.partners,
+                        [partner]:{
+                            videoWebCamRef:React.createRef(),
+                            stream: e.streams[0]
+                        }
+                    }
+                });
             }
         )
         that.setState({ PC });
     }
     startVideoChat = async ()=>{
         console.log("start video chat");
-        this.startLocalVideo(await this.state.PC.startStream());
+        await this.state.PC.start()
+        this.startLocalVideo(await this.getVideoStream());
     }
     render = ()=>(
         <section className="top" >
@@ -225,7 +239,7 @@ class SocketComponent extends React.Component {
                     </div>
                 </div>
             </div>
-            <div className="flex-row">
+            <div className="videos flex-row">
                 <div>
                     <label className="flex-column">
                         local
@@ -233,12 +247,14 @@ class SocketComponent extends React.Component {
                     <video autoPlay ref={this.videoWebCamRefLoc} id="videoElementLoc"></video>
 
                 </div>
-                <div className="flex-column">
-                    <label>
-                        foreign
-                    </label>
-                    <video autoPlay ref={this.videoWebCamRefFor} id="videoElementFor" controls></video>
-                </div>
+                {Object.entries(this.state.partners).map(([name,obj])=>(
+                    <div className="flex-column">
+                        <label>
+                            {name}
+                        </label>
+                        <video autoPlay ref={obj.videoWebCamRef} id="videoElementFor" controls></video>
+                    </div>
+                ))}
 
 
             </div>

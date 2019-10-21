@@ -2666,7 +2666,7 @@ module.exports = function(a, b){
 
 exports = module.exports = __webpack_require__(/*! ../../../node_modules/css-loader/dist/runtime/api.js */ "./node_modules/css-loader/dist/runtime/api.js")(false);
 // Module
-exports.push([module.i, ".flex-row {\n    display: flex;\n    flex-direction: row;\n}\n\n.flex-column {\n    display: flex;\n    flex-direction: column;\n}\n\n.top{\n    background-color: beige;\n    width: fit-content;\n    margin: auto; \n    padding: 50px;\n    border: 3px solid goldenrod;\n    border-radius: 10px;\n    box-sizing: border-box;\n    color: rgb(23, 23, 23);\n    font-size: 18px;\n}\n\n.messageBox {\n    height: 80vh;\n    box-sizing: border-box;\n    border: 1px solid rgb(38, 38, 38);\n    padding-bottom: 0;\n    width: 400px;\n    justify-content: space-between;\n}\n.messageBox-input{\n    justify-content: space-between;\n}\n.messageBox-input input{\n    height: 30px;\n    width: 100%;\n    font-size:24px;\n}\n.messageBox-input button{\n    width: 50px;\n}\n.channelBox > div:first-child{\n    border-bottom: 1px solid rgb(38, 38, 38);\n}\n.channelBox{\n    box-sizing: border-box;\n    height: 80vh;\n    border: 1px solid rgb(38, 38, 38);\n    width: 100px;\n    border-right: 0;\n}\n.channelBox *{\n    margin:auto;\n    width:fit-content;\n}", ""]);
+exports.push([module.i, ".flex-row {\n    display: flex;\n    flex-direction: row;\n}\n\n.flex-column {\n    display: flex;\n    flex-direction: column;\n}\n\n.top{\n    background-color: beige;\n    width: fit-content;\n    margin: auto; \n    padding: 50px;\n    border: 3px solid goldenrod;\n    border-radius: 10px;\n    box-sizing: border-box;\n    color: rgb(23, 23, 23);\n    font-size: 18px;\n}\n.videos video{\n    width: 300px;\n    height: 300px;\n}\n.messageBox {\n    height: 80vh;\n    box-sizing: border-box;\n    border: 1px solid rgb(38, 38, 38);\n    padding-bottom: 0;\n    width: 400px;\n    justify-content: space-between;\n}\n.messageBox-input{\n    justify-content: space-between;\n}\n.messageBox-input input{\n    height: 30px;\n    width: 100%;\n    font-size:24px;\n}\n.messageBox-input button{\n    width: 50px;\n}\n.channelBox > div:first-child{\n    border-bottom: 1px solid rgb(38, 38, 38);\n}\n.channelBox{\n    box-sizing: border-box;\n    height: 80vh;\n    border: 1px solid rgb(38, 38, 38);\n    width: 100px;\n    border-right: 0;\n}\n.channelBox *{\n    margin:auto;\n    width:fit-content;\n}", ""]);
 
 
 /***/ }),
@@ -42293,7 +42293,8 @@ class SocketComponent extends React.Component {
             auth: false,
             userName: "websocket U " + Date.now() % 1000,
             PC: null,
-            localStream: null
+            localStream: null,
+            partners: {}
         };
         this.streamAwaiter = new streamAwaiter_1.StreamAwaiter();
         this.sendToServer = (socket, msg, checker = null) => {
@@ -42336,26 +42337,24 @@ class SocketComponent extends React.Component {
                         console.log('json parse error', { msg, error });
                     }
                 }
-                if (this.state.auth) {
-                    if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
-                        this.setState({
-                            msgs: [...this.state.msgs, `${newline_1.newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
-                        });
+                if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
+                    this.setState({
+                        msgs: [...this.state.msgs, `${newline_1.newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
+                    });
+                }
+                if (isChannelPostResponse(msg) && msg.payload.channelName) {
+                    msg = msg;
+                    const channelName = msg.payload.channelName;
+                    const userThatJoined = msg.payload.userThatJoined;
+                    const displayName = userThatJoined === this.state.userName ? "You" : userThatJoined;
+                    let channels = this.state.channels;
+                    if (!this.state.channels.some(c => c === channelName)) {
+                        channels = [...this.state.channels, msg.payload.channelName];
                     }
-                    if (isChannelPostResponse(msg) && msg.payload.channelName) {
-                        msg = msg;
-                        const channelName = msg.payload.channelName;
-                        const userThatJoined = msg.payload.userThatJoined;
-                        const displayName = userThatJoined === this.state.userName ? "You" : userThatJoined;
-                        let channels = this.state.channels;
-                        if (!this.state.channels.some(c => c === channelName)) {
-                            channels = [...this.state.channels, msg.payload.channelName];
-                        }
-                        this.setState({
-                            msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
-                            channels
-                        });
-                    }
+                    this.setState({
+                        msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
+                        channels
+                    });
                 }
                 this.streamAwaiter.onData(msg);
             });
@@ -42369,7 +42368,7 @@ class SocketComponent extends React.Component {
         };
         this.getVideoStream = () => {
             if (this.state.localStream) {
-                return this.state.localStream;
+                return Promise.resolve(this.state.localStream);
             }
             else {
                 return navigator.mediaDevices.getUserMedia({ video: true })
@@ -42382,25 +42381,23 @@ class SocketComponent extends React.Component {
         };
         this.startRTC = () => {
             const that = this;
-            const PC = rtcHandler_1.newRTCConnection(that.state.userName, this.getVideoStream, that.streamAwaiter)((msg, checker) => that.sendToServer(that.state.socket, msg, checker), that.state.currentChannel, (e) => {
-                console.log("on track callback");
-                const forVideo = that.videoWebCamRefFor.current;
-                if (forVideo.srcObject)
-                    console.warn("foreign video already exists for this video el");
-                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-                    console.log("got track", { e, forVideo });
-                    forVideo.srcObject = e.streams[0];
-                    forVideo.play().then(p => console.log("playing", { p })).catch((error) => {
-                        console.log({ error });
-                    });
-                    this.startLocalVideo(yield that.getVideoStream());
-                }), 1500);
+            const PC = new rtcHandler_1.RTCClientManager(that.state.userName, () => that.state.currentChannel, this.streamAwaiter, this.getVideoStream, (msg, checker) => that.sendToServer(that.state.socket, msg, checker), (e, partner) => {
+                console.log("on track callback", { e, partner, partners: this.state.partners });
+                this.getVideoStream()
+                    .then(s => this.startLocalVideo(s));
+                this.setState({
+                    partners: Object.assign(Object.assign({}, this.state.partners), { [partner]: {
+                            videoWebCamRef: React.createRef(),
+                            stream: e.streams[0]
+                        } })
+                });
             });
             that.setState({ PC });
         };
         this.startVideoChat = () => __awaiter(this, void 0, void 0, function* () {
             console.log("start video chat");
-            this.startLocalVideo(yield this.state.PC.startStream());
+            yield this.state.PC.start();
+            this.startLocalVideo(yield this.getVideoStream());
         });
         this.render = () => (React.createElement("section", { className: "top" },
             "current channel:",
@@ -42418,13 +42415,13 @@ class SocketComponent extends React.Component {
                     React.createElement("div", { className: "messageBox-input flex-row" },
                         React.createElement("input", { placeholder: "Enter Message", value: this.state.msg, onChange: (e) => this.setState({ msg: e.target.value }) }),
                         React.createElement("button", { onClick: () => this.createTextmessage() })))),
-            React.createElement("div", { className: "flex-row" },
+            React.createElement("div", { className: "videos flex-row" },
                 React.createElement("div", null,
                     React.createElement("label", { className: "flex-column" }, "local"),
                     React.createElement("video", { autoPlay: true, ref: this.videoWebCamRefLoc, id: "videoElementLoc" })),
-                React.createElement("div", { className: "flex-column" },
-                    React.createElement("label", null, "foreign"),
-                    React.createElement("video", { autoPlay: true, ref: this.videoWebCamRefFor, id: "videoElementFor", controls: true })))));
+                Object.entries(this.state.partners).map(([name, obj]) => (React.createElement("div", { className: "flex-column" },
+                    React.createElement("label", null, name),
+                    React.createElement("video", { autoPlay: true, ref: obj.videoWebCamRef, id: "videoElementFor", controls: true })))))));
         this.login = (socket) => this.sendToServer(socket, new messages_1.UserPostRequest({ userName: this.state.userName }), m => isLoginResponse(m)).then(msg => this.setState({
             auth: true,
             channels: msg.payload.channels.map(c => c.name),
@@ -42460,7 +42457,6 @@ class SocketComponent extends React.Component {
             }));
         };
         this.videoWebCamRefLoc = React.createRef();
-        this.videoWebCamRefFor = React.createRef();
     }
     componentDidMount() {
         const that = this;
@@ -42473,6 +42469,18 @@ class SocketComponent extends React.Component {
                 console.log("Something went wrong!", { e });
             });
         });
+    }
+    componentDidUpdate(pp, ps) {
+        if (ps.partners !== this.state.partners) {
+            Object.entries(this.state.partners).forEach(([name, obj]) => {
+                if (!obj.videoWebCamRef.current.srcObject) {
+                    obj.videoWebCamRef.current.srcObject = obj.stream;
+                    obj.videoWebCamRef.current.play().then(p => console.log("playing", { p })).catch((error) => {
+                        console.log({ name, error });
+                    });
+                }
+            });
+        }
     }
 }
 document.addEventListener("DOMContentLoaded", () => {
@@ -42534,121 +42542,215 @@ const configuration = {
             urls: 'stun:stun.l.google.com:19302' // Google's public STUN server
         }]
 };
-const waitForIce = (streamAwaiter, PC, forCandidates, username) => {
-    console.log("wait for ice");
-    streamAwaiter.waitFor(m => {
-        if (m.payload.candidate && m.payload.from !== username) {
-            console.log("got ice", { m });
-            return true;
-        }
-    }).then(ice => {
-        const candidate = ice.payload.candidate;
-        if (candidate) {
-            if (PC.remoteDescription) {
-                console.log("adding candidate", { candidate });
-                if (PC.iceGatheringState !== "complete") {
-                    PC.addIceCandidate(candidate);
+class RTCClient {
+    constructor(username, channel, streamAwaiter, getVideoStream, sendMessageToTargetClient, onTrackReceived, onExtraPartner = null, onPartner = null) {
+        this.username = username;
+        this.channel = channel;
+        this.streamAwaiter = streamAwaiter;
+        this.getVideoStream = getVideoStream;
+        this.sendMessageToTargetClient = sendMessageToTargetClient;
+        this.onTrackReceived = onTrackReceived;
+        this.onExtraPartner = onExtraPartner;
+        this.onPartner = onPartner;
+        this.forCandidates = [];
+        this.PC = null;
+        this.isInitiator = false;
+        this.receivedOffer = false;
+        this.offering = false;
+        this.partner = null;
+        this.startOffering = () => __awaiter(this, void 0, void 0, function* () {
+            if (!this.isInitiator && !this.offering) {
+                const stream = yield this.getVideoStream();
+                this.offering = true;
+                stream.getTracks().forEach((track) => this.PC.addTrack(track, stream));
+                return stream;
+            }
+        });
+        this.startStream = (onPartner = null) => __awaiter(this, void 0, void 0, function* () {
+            const stream = yield this.startOffering();
+            if (onPartner) {
+                this.onPartner = onPartner;
+            }
+            this.isInitiator = true;
+            return stream;
+        });
+        this.waitForIce = (streamAwaiter, PC, forCandidates, username) => {
+            console.log("wait for ice", this);
+            streamAwaiter.waitFor(m => {
+                if (m.payload.candidate &&
+                    m.payload.to === this.username &&
+                    m.payload.from === this.partner) {
+                    console.log("candidate", { m, this: this, partner: this.partner }, m.payload.candidate && m.payload.from === this.partner);
+                    return true;
                 }
+            }).then(ice => {
+                console.log("got ice", { ice }, this);
+                const candidate = ice.payload.candidate;
+                if (candidate) {
+                    if (PC.remoteDescription) {
+                        console.log("adding candidate", { candidate }, this);
+                        if (PC.iceGatheringState !== "complete") {
+                            // this.forCandidates.push(candidate);
+                            PC.addIceCandidate(candidate);
+                        }
+                    }
+                    else {
+                        forCandidates.push(candidate);
+                    }
+                }
+                this.waitForIce(streamAwaiter, PC, forCandidates, username);
+            }).catch(e => console.log("receive offer went wront", { e }));
+        };
+        this.onOffer = (msg) => __awaiter(this, void 0, void 0, function* () {
+            if (msg.payload.from === this.partner && this.receivedOffer === true) {
+                console.log("swallow reciegd offer", { msg, this: this });
+                return;
+            }
+            this.partner = msg.payload.from;
+            this.receivedOffer = true;
+            const PC = this.PC;
+            console.log("on recieve offer create answer", this, { cs: PC.signalingState, PC, msg });
+            yield PC.setRemoteDescription(msg.payload.description);
+            if (this.forCandidates.length > 0 && PC.iceGatheringState !== "completed") {
+                console.log("receiveOffer - adding candidates");
+                this.forCandidates.forEach(c => {
+                    PC.addIceCandidate(c);
+                });
+            }
+            const ans = yield PC.createAnswer();
+            yield PC.setLocalDescription(ans);
+            const username = this.username;
+            const res = new messages_1.WebRTCAnswerStream(msg, { username }, PC.localDescription);
+            console.log("sending answer", { res });
+            this.sendMessageToTargetClient(res);
+            this.startOffering();
+        });
+        this.onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
+            if (candidate) {
+                sendMessageToTargetClient(new messages_1.WebRTCIceCandidate({
+                    channel,
+                    candidate,
+                    from: username,
+                    to: this.partner
+                }));
+            }
+        };
+        this.onnegotiationneeded = (sendMessageToTargetClient, PC, channel, username) => () => __awaiter(this, void 0, void 0, function* () {
+            console.log("onnegotiationneeded, try send offer", this);
+            const waitForAnswer = () => {
+                this.streamAwaiter.waitFor((msg) => msg.isResponse &&
+                    msg.payload.description &&
+                    msg.payload.offerFrom === username &&
+                    (!this.partner || (this.partner && msg.payload.answerFrom === this.partner))).then((answer) => {
+                    let ret;
+                    console.log("received answer", { answer, cs: PC.signalingState });
+                    if (this.partner && this.partner !== answer.payload.answerFrom) {
+                        console.log("extra partner going back to manager", this, answer);
+                        ret = setTimeout(() => {
+                            this.onExtraPartner(answer);
+                        }, 1500);
+                    }
+                    else {
+                        console.log("answer negotation parter", { this: this, answer });
+                        this.partner = answer.payload.answerFrom;
+                        if (this.onPartner) {
+                            this.onPartner(this.partner, answer);
+                        }
+                        ret = PC.setRemoteDescription(answer.payload.description);
+                    }
+                    waitForAnswer();
+                    return ret;
+                });
+            };
+            try {
+                PC.createOffer()
+                    .then(offer => {
+                    console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
+                    return PC.setLocalDescription(offer);
+                })
+                    .then(() => {
+                    console.log("send offer", this, { PC, ld: PC.localDescription });
+                    sendMessageToTargetClient(new messages_1.WebRTCOfferStream({
+                        channel,
+                        from: username,
+                        description: PC.localDescription
+                    }));
+                    return waitForAnswer();
+                });
+            }
+            catch (error) {
+                console.error({ error });
+            }
+        });
+        this.PC = new RTCPeerConnection(configuration);
+        this.PC.onicecandidate = this.onicecandidate(sendMessageToTargetClient, username, channel).bind(this);
+        this.PC.onnegotiationneeded = this.onnegotiationneeded(sendMessageToTargetClient, this.PC, channel, username);
+        this.PC.ontrack = (e) => {
+            console.log("PC.ontrack", { this: this, cs: this.PC.iceGatheringState, e });
+            if (this.forCandidates.length > 0 && this.PC.iceGatheringState !== "completed") {
+                this.forCandidates.forEach(c => {
+                    console.log("receiveOffer - adding candidates", { c });
+                    this.PC.addIceCandidate(c);
+                });
+            }
+            onTrackReceived(e, this.partner);
+        };
+        this.waitForIce(streamAwaiter, this.PC, this.forCandidates, username);
+        // this.waitForRTCOffer(streamAwaiter, this.PC, this.forCandidates, username, this.startOffering, sendMessageToTargetClient);
+    }
+}
+exports.RTCClient = RTCClient;
+class RTCClientManager {
+    constructor(username, getChannel, streamAwaiter, getVideoStream, sendMessageToTargetClient, onTrackReceived) {
+        this.username = username;
+        this.getChannel = getChannel;
+        this.streamAwaiter = streamAwaiter;
+        this.getVideoStream = getVideoStream;
+        this.sendMessageToTargetClient = sendMessageToTargetClient;
+        this.onTrackReceived = onTrackReceived;
+        this.connections = {};
+        this.initiator = null;
+        this.waitForRTCOffer = () => {
+            const that = this;
+            this.streamAwaiter.waitFor(m => {
+                if (m.payload.description && !m.isResponse && m.payload.from !== this.username) {
+                    return true;
+                }
+            }).then((msg) => __awaiter(this, void 0, void 0, function* () {
+                const potentialPartner = msg.payload.from;
+                this.gotPotentialPartner(potentialPartner, msg);
+                that.waitForRTCOffer();
+            })).catch(e => console.log("receive offer went wront", { e }));
+        };
+        this.gotPotentialPartner = (potentialPartner, msg) => {
+            if (!this.connections[potentialPartner]) {
+                console.log("manager got new offer", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
+                const nClient = this.newConnection();
+                // nClient.partner = potentialPartner;
+                this.connections[potentialPartner] = nClient;
             }
             else {
-                forCandidates.push(candidate);
+                console.log("manager got offer for existing conection", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
             }
-        }
-        waitForIce(streamAwaiter, PC, forCandidates, username);
-    }).catch(e => console.log("receive offer went wront", { e }));
-};
-const waitForRTCOffer = (streamAwaiter, PC, forCandidates, username, startOffering, sendMessageToTargetClient) => {
-    streamAwaiter.waitFor(m => {
-        if (m.payload.description && !m.isResponse && m.payload.from !== username) {
-            console.log("got offer");
-            return true;
-        }
-    }).then((msg) => __awaiter(void 0, void 0, void 0, function* () {
-        console.log("on recieve offer create answer", { cs: PC.signalingState, PC, msg });
-        yield PC.setRemoteDescription(msg.payload.description);
-        if (forCandidates.length > 0 && PC.iceGatheringState !== "completed") {
-            forCandidates.forEach(c => {
-                console.log("receiveOffer - adding candidates", { c });
-                PC.addIceCandidate(c);
+            this.connections[potentialPartner].onOffer(msg);
+        };
+        this.newConnection = () => {
+            return new RTCClient(this.username, this.getChannel(), this.streamAwaiter, this.getVideoStream, this.sendMessageToTargetClient, this.onTrackReceived, (msg) => {
+                const potentialPartner = msg.payload.answerFrom;
+                console.log("manager got extra answer", { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
+                this.gotPotentialPartner(potentialPartner, msg);
             });
-        }
-        const ans = yield PC.createAnswer();
-        console.log("receiveOffer - set local desc ", { cs: PC.signalingState, PC, msg, ld: PC.localDescription });
-        yield PC.setLocalDescription(ans);
-        const res = new messages_1.WebRTCAnswerStream(msg, { username }, PC.localDescription);
-        console.log("sending answer", { res });
-        sendMessageToTargetClient(res);
-        startOffering();
-        // waitForRTCOffer(streamAwaiter,PC, forCandidates, username, sendMessageToTargetClient);
-    })).catch(e => console.log("receive offer went wront", { e }));
-};
-const onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
-    if (candidate) {
-        console.log("on ice candidate", { candidate });
-        sendMessageToTargetClient(new messages_1.WebRTCIceCandidate({
-            channel,
-            candidate,
-            from: username
-        }));
-    }
-};
-const onnegotiationneeded = (sendMessageToTargetClient, PC, channel, username) => () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("onnegotiationneeded, try send offer");
-    try {
-        PC.createOffer()
-            .then(offer => {
-            console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
-            return PC.setLocalDescription(offer);
-        })
-            .then(() => {
-            console.log("send offer", { PC, ld: PC.localDescription });
-            return sendMessageToTargetClient(new messages_1.WebRTCOfferStream({
-                channel,
-                from: username,
-                description: PC.localDescription
-            }), (msg) => msg.isResponse &&
-                msg.payload.description &&
-                msg.payload.answerFrom !== username);
-        })
-            .then((answer) => {
-            console.log("received answer", { answer, cs: PC.signalingState });
-            PC.setRemoteDescription(answer.payload.description);
-        });
-    }
-    catch (error) {
-        console.error({ error });
-    }
-});
-exports.newRTCConnection = (username, getVideoStream, streamAwaiter) => {
-    const forCandidates = [];
-    return (sendMessageToTargetClient, channel, onTrackReceived) => {
-        const PC = new RTCPeerConnection(configuration);
-        let isInitiator = false;
-        const startOffering = () => __awaiter(void 0, void 0, void 0, function* () {
-            if (!isInitiator) {
-                const stream = yield getVideoStream();
-                stream.getTracks().forEach((track) => PC.addTrack(track, stream));
-                return stream;
-            }
-        });
-        PC.onicecandidate = onicecandidate(sendMessageToTargetClient, username, channel);
-        PC.onnegotiationneeded = onnegotiationneeded(sendMessageToTargetClient, PC, channel, username);
-        PC.ontrack = (e) => {
-            console.log("on track", { cs: PC.signalingState, e });
-            onTrackReceived(e);
         };
-        waitForIce(streamAwaiter, PC, forCandidates, username);
-        waitForRTCOffer(streamAwaiter, PC, forCandidates, username, startOffering, sendMessageToTargetClient);
-        return {
-            PC,
-            startStream: () => __awaiter(void 0, void 0, void 0, function* () {
-                const stream = yield startOffering();
-                isInitiator = true;
-                return stream;
-            })
+        this.start = () => {
+            this.initiator = this.newConnection();
+            this.initiator.startStream((p, m) => {
+                this.connections[p] = this.initiator;
+            });
         };
-    };
-};
+        this.waitForRTCOffer();
+    }
+}
+exports.RTCClientManager = RTCClientManager;
 
 
 /***/ }),
