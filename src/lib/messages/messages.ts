@@ -7,8 +7,8 @@ export type HandledRequests =
     | ChannelGetRequest
     | WebRTCIceCandidate
     | WebRTCOfferStream
-export type HandledResponses = TextMessagePostResponse | ChannelPostResponse | WebRTCAnswerStream;
 
+export type HandledResponses = TextMessagePostResponse | ChannelPostResponse | WebRTCAnswerStream;
 
 
 export class UserPostRequest implements Request {
@@ -91,7 +91,10 @@ export class WebRTCOfferStream implements Request{
     constructor(public payload : {
         channel:string,
         description:any,
-        from:string
+        from:string,
+        renegotation?:{
+            to:string,
+        }
     }) { }
 }
 export class WebRTCAnswerStream extends Response<WebRTCOfferStream> {

@@ -14,7 +14,7 @@ export class Channel implements IdedEntity {
         return user; 
     }
     removeUser = (user: User)=>this.users.remove(user);
-
+    getUserByName = (name:string):User=>this.users.getBy(u=>u.username === name);
     static getChannel = (id: number): Channel => Store.getStore().channels.get(id);
     static getChannelByName = (name: string): Channel => Store.getStore().channels.getByName(name);
     static addChannel = (channel): Channel => Store.getStore().channels.add(channel);

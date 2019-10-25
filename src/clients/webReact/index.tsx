@@ -10,6 +10,10 @@ import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import { newLineArt } from "../../lib/util/newline";
 import {  RTCClientManager} from "./rtcHandler"
 
+
+
+
+
 interface HelloProps { compiler: string; framework: string; }
 const Hello = (props: HelloProps) => (
     <section>
@@ -93,6 +97,7 @@ class SocketComponent extends React.Component {
             this.configureSocket()
                 .then(() => {
                     that.startRTC();
+                    document.title = this.state.userName.split("websocket")[1];
                 })
                 .catch(function (e) {
                     console.log("Something went wrong!", { e });
@@ -133,7 +138,6 @@ class SocketComponent extends React.Component {
             console.log("connect", new Date().getMinutes(), { e }) 
         });
         socket.on(websocketMessageEventName, (msg: HandledResponses | UserPostResponse) => {
-            // console.log("recieved", { msg });
             if (typeof msg === 'string') {
                 try {
                     msg = JSON.parse(msg);
@@ -141,6 +145,8 @@ class SocketComponent extends React.Component {
                     console.log('json parse error', { msg, error });
                 }
             }
+            // (msg as any).action !== "META" && console.log("recieved", { msg });
+
             if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
                 this.setState({
                     msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
@@ -207,7 +213,8 @@ class SocketComponent extends React.Component {
     }
     startVideoChat = async ()=>{
         console.log("start video chat");
-        await this.state.PC.start()
+        await this.state.PC.start();
+        document.title = "[P]" + document.title 
         this.startLocalVideo(await this.getVideoStream());
     }
     render = ()=>(

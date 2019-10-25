@@ -11,7 +11,7 @@ export enum MessageTypes {
     textMessage = "TEXT_MESSAGE",
     channelCommand = "CHANNEL_COMMAND",
     login = "LOGIN",
-    WRTCAV = "WebRTC-AV"
+    WRTCAV = "WebRTCAV"
 }
 export enum DestinationTypes {
     channel = "CHANNEL",
@@ -22,12 +22,12 @@ export interface MessageLike {
     action: ActionTypes
     payload:any
 }
-export interface Request{
+export interface Request extends MessageLike{
     type: MessageTypes
     action: ActionTypes 
     payload: any
 }
-export abstract class Response<Req extends Request>{
+export abstract class Response<Req extends Request> implements MessageLike{
     constructor(req:Req){
         this.type = req.type
         this.action = req.action;
@@ -35,4 +35,5 @@ export abstract class Response<Req extends Request>{
     type: Req["type"];
     action: Req["action"]
     isResponse:boolean = true;
+    payload: any
 }

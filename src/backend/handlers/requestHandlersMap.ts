@@ -58,3 +58,12 @@ export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
     },
 
 }
+
+
+                //TODO direct message
+                // if(message.payload.to){
+                //     const user = channel.getUserByName(message.payload.to);
+                //     if(user){
+                //         user.writeToAllSockets(message);
+                //     }
+                // }

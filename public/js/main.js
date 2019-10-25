@@ -42328,7 +42328,6 @@ class SocketComponent extends React.Component {
                 console.log("connect", new Date().getMinutes(), { e });
             });
             socket.on(socket_1.websocketMessageEventName, (msg) => {
-                // console.log("recieved", { msg });
                 if (typeof msg === 'string') {
                     try {
                         msg = JSON.parse(msg);
@@ -42337,6 +42336,7 @@ class SocketComponent extends React.Component {
                         console.log('json parse error', { msg, error });
                     }
                 }
+                // (msg as any).action !== "META" && console.log("recieved", { msg });
                 if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
                     this.setState({
                         msgs: [...this.state.msgs, `${newline_1.newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
@@ -42397,6 +42397,7 @@ class SocketComponent extends React.Component {
         this.startVideoChat = () => __awaiter(this, void 0, void 0, function* () {
             console.log("start video chat");
             yield this.state.PC.start();
+            document.title = "[P]" + document.title;
             this.startLocalVideo(yield this.getVideoStream());
         });
         this.render = () => (React.createElement("section", { className: "top" },
@@ -42464,6 +42465,7 @@ class SocketComponent extends React.Component {
             this.configureSocket()
                 .then(() => {
                 that.startRTC();
+                document.title = this.state.userName.split("websocket")[1];
             })
                 .catch(function (e) {
                 console.log("Something went wrong!", { e });
@@ -42555,10 +42557,12 @@ class RTCClient {
         this.forCandidates = [];
         this.PC = null;
         this.isInitiator = false;
-        this.receivedOffer = false;
+        this.sentOffer = false;
         this.offering = false;
+        this.recievedOffer = false;
         this.partner = null;
         this.startOffering = () => __awaiter(this, void 0, void 0, function* () {
+            console.log("start offering", !this.isInitiator && !this.offering, this);
             if (!this.isInitiator && !this.offering) {
                 const stream = yield this.getVideoStream();
                 this.offering = true;
@@ -42589,10 +42593,8 @@ class RTCClient {
                 if (candidate) {
                     if (PC.remoteDescription) {
                         console.log("adding candidate", { candidate }, this);
-                        if (PC.iceGatheringState !== "complete") {
-                            // this.forCandidates.push(candidate);
-                            PC.addIceCandidate(candidate);
-                        }
+                        // this.forCandidates.push(candidate);
+                        PC.addIceCandidate(candidate);
                     }
                     else {
                         forCandidates.push(candidate);
@@ -42602,16 +42604,16 @@ class RTCClient {
             }).catch(e => console.log("receive offer went wront", { e }));
         };
         this.onOffer = (msg) => __awaiter(this, void 0, void 0, function* () {
-            if (msg.payload.from === this.partner && this.receivedOffer === true) {
+            if (this.recievedOffer && (this.partner && !(msg.payload.renegotation && msg.payload.renegotation.to === this.username))) {
                 console.log("swallow reciegd offer", { msg, this: this });
                 return;
             }
+            this.recievedOffer = true;
             this.partner = msg.payload.from;
-            this.receivedOffer = true;
             const PC = this.PC;
             console.log("on recieve offer create answer", this, { cs: PC.signalingState, PC, msg });
-            yield PC.setRemoteDescription(msg.payload.description);
-            if (this.forCandidates.length > 0 && PC.iceGatheringState !== "completed") {
+            yield PC.setRemoteDescription(msg.payload.description).catch(e => console.error("ONOFFER couldnt set remote description", { msg }));
+            if (this.forCandidates.length > 0) {
                 console.log("receiveOffer - adding candidates");
                 this.forCandidates.forEach(c => {
                     PC.addIceCandidate(c);
@@ -42635,52 +42637,50 @@ class RTCClient {
                 }));
             }
         };
+        this.waitForAnswer = (PC, username) => this.streamAwaiter.waitFor((msg) => msg.isResponse &&
+            msg.payload.description &&
+            msg.payload.offerFrom === username &&
+            (!this.partner || (this.partner && msg.payload.answerFrom === this.partner))).then((answer) => {
+            let ret;
+            console.log("received answer", { answer, cs: PC.signalingState });
+            if (this.partner && this.partner !== answer.payload.answerFrom) {
+                console.log("extra partner going back to manager", this, answer);
+                ret = setTimeout(() => {
+                    this.onExtraPartner(answer);
+                }, 1500);
+            }
+            else {
+                this.partner = answer.payload.answerFrom;
+                console.log("answer negotation partner setRemoteDesc", { this: this, answer });
+                if (this.onPartner) {
+                    this.onPartner(this.partner, answer);
+                }
+                ret = PC.setRemoteDescription(answer.payload.description).catch(e => console.error("ON ASWERtry set remote desc failed", { answer, e, this: this }));
+            }
+            this.waitForAnswer(PC, username);
+            return ret;
+        });
         this.onnegotiationneeded = (sendMessageToTargetClient, PC, channel, username) => () => __awaiter(this, void 0, void 0, function* () {
-            console.log("onnegotiationneeded, try send offer", this);
-            const waitForAnswer = () => {
-                this.streamAwaiter.waitFor((msg) => msg.isResponse &&
-                    msg.payload.description &&
-                    msg.payload.offerFrom === username &&
-                    (!this.partner || (this.partner && msg.payload.answerFrom === this.partner))).then((answer) => {
-                    let ret;
-                    console.log("received answer", { answer, cs: PC.signalingState });
-                    if (this.partner && this.partner !== answer.payload.answerFrom) {
-                        console.log("extra partner going back to manager", this, answer);
-                        ret = setTimeout(() => {
-                            this.onExtraPartner(answer);
-                        }, 1500);
-                    }
-                    else {
-                        console.log("answer negotation parter", { this: this, answer });
-                        this.partner = answer.payload.answerFrom;
-                        if (this.onPartner) {
-                            this.onPartner(this.partner, answer);
-                        }
-                        ret = PC.setRemoteDescription(answer.payload.description);
-                    }
-                    waitForAnswer();
-                    return ret;
-                });
-            };
-            try {
-                PC.createOffer()
-                    .then(offer => {
-                    console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
-                    return PC.setLocalDescription(offer);
-                })
-                    .then(() => {
+            console.log("onnegotiationneeded, try send offer", { partner: this.partner }, this);
+            PC.createOffer()
+                .then(offer => {
+                console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
+                return PC.setLocalDescription(offer);
+            })
+                .then(() => {
+                if (!this.sentOffer) {
                     console.log("send offer", this, { PC, ld: PC.localDescription });
-                    sendMessageToTargetClient(new messages_1.WebRTCOfferStream({
+                    let offer = new messages_1.WebRTCOfferStream({
                         channel,
                         from: username,
                         description: PC.localDescription
-                    }));
-                    return waitForAnswer();
-                });
-            }
-            catch (error) {
-                console.error({ error });
-            }
+                    });
+                    this.sentOffer = true;
+                    sendMessageToTargetClient(offer);
+                    return this.waitForAnswer(PC, username);
+                }
+            })
+                .catch(e => console.error("negotaiotn needed", { e }));
         });
         this.PC = new RTCPeerConnection(configuration);
         this.PC.onicecandidate = this.onicecandidate(sendMessageToTargetClient, username, channel).bind(this);
@@ -42730,7 +42730,7 @@ class RTCClientManager {
                 this.connections[potentialPartner] = nClient;
             }
             else {
-                console.log("manager got offer for existing conection", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
+                console.warn("manager got offer for existing conection", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
             }
             this.connections[potentialPartner].onOffer(msg);
         };
@@ -42779,7 +42779,7 @@ var MessageTypes;
     MessageTypes["textMessage"] = "TEXT_MESSAGE";
     MessageTypes["channelCommand"] = "CHANNEL_COMMAND";
     MessageTypes["login"] = "LOGIN";
-    MessageTypes["WRTCAV"] = "WebRTC-AV";
+    MessageTypes["WRTCAV"] = "WebRTCAV";
 })(MessageTypes = exports.MessageTypes || (exports.MessageTypes = {}));
 var DestinationTypes;
 (function (DestinationTypes) {
@@ -42935,6 +42935,7 @@ class RecordStore {
         this.remove = (object) => { delete this.store[object.id]; return object; };
         this.removeById = (id) => delete this.store[id];
         this.get = (id) => this.store[id];
+        this.getBy = (cb) => Object.values(this.store).find(item => cb(item));
         this.store = store;
     }
 }
