@@ -1,85 +1,84 @@
 server start
 listenting on 3005
 TCP connection { fd: 26, httpBool: true }
+TCP connection { fd: 27, httpBool: true }
 TCP connection { fd: 28, httpBool: true }
 IdentityGetter try undefined
-new user { name: 'websocket U 656',
+new user { name: 'websocket U 954',
   id: 1,
   isJson: true,
   swId: 0,
   handle: undefined }
-[ { name: 'websocket U 656', sockets: [ [WebSocketWrapper] ] } ]
-socket configured websocket U 656
-peak http:timed out for message
-TCP connection { fd: 27, httpBool: false }
-IdentityGetter try { fd: 27 }
+[ { name: 'websocket U 954', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 954
 TCP connection { fd: 29, httpBool: true }
 IdentityGetter try undefined
-new user { name: 'websocket U 800',
+new user { name: 'websocket U 570',
   id: 2,
   isJson: true,
-  swId: 2,
+  swId: 1,
   handle: undefined }
-[ { name: 'websocket U 656', sockets: [ [WebSocketWrapper] ] },
-  { name: 'websocket U 800', sockets: [ [WebSocketWrapper] ] } ]
-socket configured websocket U 800
+[ { name: 'websocket U 954', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 570', sockets: [ [WebSocketWrapper] ] } ]
+socket configured websocket U 570
 ws on data { m:
-   '{"payload":{"body":"hello","destination":{"type":"CHANNEL","val":"all"}},"type":"TEXT_MESSAGE","action":"POST"}',
+   '{"payload":{"body":"hi"},"destination":{"type":"CHANNEL","val":"all"},"type":"TEXT_MESSAGE","action":"POST"}',
   type: 'string' }
 received message { msg:
-   { payload: { body: 'hello', destination: [Object] },
+   { payload: { body: 'hi' },
+     destination: { type: 'CHANNEL', val: 'all' },
      type: 'TEXT_MESSAGE',
      action: 'POST' } }
-error getting identity message timeout
-bailed out of identity getter
+ws on data { m:
+   '{"payload":{"body":"hi back"},"destination":{"type":"CHANNEL","val":"all"},"type":"TEXT_MESSAGE","action":"POST"}',
+  type: 'string' }
+received message { msg:
+   { payload: { body: 'hi back' },
+     destination: { type: 'CHANNEL', val: 'all' },
+     type: 'TEXT_MESSAGE',
+     action: 'POST' } }
 peak http:timed out for message
 TCP connection { fd: 26, httpBool: false }
 IdentityGetter try { fd: 26 }
 handle chunk { chunk:
-   <Buffer 7b 22 70 61 79 6c 6f 61 64 22 3a 7b 22 75 73 65 72 4e 61 6d 65 22 3a 22 61 6b 54 65 72 6d 22 7d 2c 22 74 79 70 65 22 3a 22 4c 4f 47 49 4e 22 2c 22 61 ... >,
+   <Buffer 7b 22 70 61 79 6c 6f 61 64 22 3a 7b 22 75 73 65 72 4e 61 6d 65 22 3a 22 74 6b 22 7d 2c 22 64 65 73 74 69 6e 61 74 69 6f 6e 22 3a 7b 22 74 79 70 65 22 ... >,
   user: undefined,
   isJson: undefined }
-new user { name: 'akTerm', id: 3, isJson: true, swId: 3, handle: 26 }
-[ { name: 'websocket U 656', sockets: [ [WebSocketWrapper] ] },
-  { name: 'websocket U 800', sockets: [ [WebSocketWrapper] ] },
-  { name: 'akTerm', sockets: [ [TCPSocketWrapper] ] } ]
-socket configured akTerm
+new user { name: 'tk', id: 3, isJson: true, swId: 2, handle: 26 }
+[ { name: 'websocket U 954', sockets: [ [WebSocketWrapper] ] },
+  { name: 'websocket U 570', sockets: [ [WebSocketWrapper] ] },
+  { name: 'tk', sockets: [ [TCPSocketWrapper] ] } ]
+socket configured tk
 received message { msg:
-   { payload: { body: 'hello', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
-received message { msg:
-   { payload: { body: '/nc', destination: [Object] },
+   { payload: { body: 'hello' },
+     destination: { type: 'CHANNEL', val: 'all' },
      type: 'TEXT_MESSAGE',
      action: 'POST' } }
 received message { msg:
    { payload: { channelName: 'nc', switchTo: true },
+     destination: { type: 'SERVER' },
      type: 'CHANNEL_COMMAND',
      action: 'POST' } }
-hi cc
-received message { msg:
-   { payload: { body: 'hello', destination: [Object] },
-     type: 'TEXT_MESSAGE',
-     action: 'POST' } }
 ws on data { m:
-   '{"payload":{"channelName":"nc","switchTo":true},"type":"CHANNEL_COMMAND","action":"POST"}',
+   '{"payload":{"channelName":"nc","switchTo":true},"destination":{"type":"SERVER"},"type":"CHANNEL_COMMAND","action":"POST"}',
   type: 'string' }
 received message { msg:
    { payload: { channelName: 'nc', switchTo: true },
+     destination: { type: 'SERVER' },
      type: 'CHANNEL_COMMAND',
      action: 'POST' } }
-hi cc
 ws on data { m:
-   '{"payload":{"body":"hi","destination":{"type":"CHANNEL","val":"nc"}},"type":"TEXT_MESSAGE","action":"POST"}',
+   '{"payload":{"body":"hi"},"destination":{"type":"CHANNEL","val":"nc"},"type":"TEXT_MESSAGE","action":"POST"}',
   type: 'string' }
 received message { msg:
-   { payload: { body: 'hi', destination: [Object] },
+   { payload: { body: 'hi' },
+     destination: { type: 'CHANNEL', val: 'nc' },
+     type: 'TEXT_MESSAGE',
+     action: 'POST' } }
+received message { msg:
+   { payload: { body: 'hi' },
+     destination: { type: 'CHANNEL', val: 'nc' },
      type: 'TEXT_MESSAGE',
      action: 'POST' } }
 Closing connection with the client
 destroying socket connection with the client { e: false }
-peak http:timed out for message
-TCP connection { fd: 26, httpBool: false }
-IdentityGetter try { fd: 26 }
-error getting identity message timeout
-bailed out of identity getter

@@ -1,4 +1,4 @@
-import { Request, Response,ActionTypes,DestinationTypes,MessageTypes} from "./message";
+import { Request, Response,ActionTypes,DestinationTypes,MessageTypes, Destination} from "./message";
 import { User } from "../store/user/user";
 import { Store } from "../store/store";
 export type HandledRequests =
@@ -9,33 +9,20 @@ export type HandledRequests =
     | WebRTCOfferStream
 
 export type HandledResponses = TextMessagePostResponse | ChannelPostResponse | WebRTCAnswerStream;
-
-
-export class UserPostRequest implements Request {
-    type: MessageTypes.login = MessageTypes.login
-    action: ActionTypes.post = ActionTypes.post
-    constructor(public payload: {
-        userName: string,
-    }) { }
-}
-
-export class UserPostResponse extends Response<UserPostRequest> {
-    constructor(msg: UserPostRequest,user:User, public payload = {
-        userName: msg.payload.userName,
-        channels:user.channels.getList().map(({name,id})=>({name,id}))
-    }) { super(msg) }
-}
+const serverDestination = { type: DestinationTypes.server }
 
 export class TextMessagePostRequest implements Request {
     type: MessageTypes.textMessage = MessageTypes.textMessage
     action: ActionTypes.post = ActionTypes.post
-    constructor(public payload: {
-        body: string
-        destination: {
-            type: DestinationTypes,
-            val: string
+    constructor(body:string,channel:string,
+        public payload= {
+            body
+        }, 
+        public destination: Destination = {
+            type:DestinationTypes.channel,
+            val:channel
         }
-    }) { }
+    ) { }
 }
 export class TextMessagePostResponse extends Response<TextMessagePostRequest> {
     constructor(req: TextMessagePostRequest, user: User, public payload = {
@@ -50,10 +37,13 @@ export class TextMessagePostResponse extends Response<TextMessagePostRequest> {
 export class ChannelPostRequest implements Request {
     type: MessageTypes.channelCommand = MessageTypes.channelCommand
     action: ActionTypes.post = ActionTypes.post
-    constructor(public payload: {
-        channelName: string,
-        switchTo: boolean
-    }) { }
+    constructor(
+        public payload: {
+            channelName: string,
+            switchTo: boolean
+        }, 
+        public destination: Destination = serverDestination
+    ) { }
 }
 export class ChannelPostResponse extends Response<ChannelPostRequest> {
     constructor(msg: ChannelPostRequest, user: User, public payload = {
@@ -65,7 +55,10 @@ export class ChannelPostResponse extends Response<ChannelPostRequest> {
 export class ChannelGetRequest implements Request {
     type: MessageTypes.channelCommand = MessageTypes.channelCommand
     action: ActionTypes.get = ActionTypes.get
-    constructor(public payload = undefined) { }
+    constructor(
+        public payload = undefined,
+        public destination: Destination = serverDestination
+    ) { }
 }
 
 export class ChannelGetResponse extends Response<ChannelGetRequest> {
@@ -83,7 +76,8 @@ export class WebRTCIceCandidate implements Request {
         channel:string,
         to:string,
         from:string
-    }) { }
+    }, 
+    public destination: Destination) { }
 }
 export class WebRTCOfferStream implements Request{
     type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
@@ -95,7 +89,8 @@ export class WebRTCOfferStream implements Request{
         renegotation?:{
             to:string,
         }
-    }) { }
+    },
+    public destination: Destination) { }
 }
 export class WebRTCAnswerStream extends Response<WebRTCOfferStream> {
     constructor(msg: WebRTCOfferStream, user:{username:string},desc: any, public payload = {
@@ -106,3 +101,18 @@ export class WebRTCAnswerStream extends Response<WebRTCOfferStream> {
     }) { super(msg) }
 }
 
+export class UserPostRequest implements Request {
+    type: MessageTypes.login = MessageTypes.login
+    action: ActionTypes.post = ActionTypes.post
+    constructor(public payload: {
+        userName: string,
+    },
+    public destination: Destination = serverDestination) { }
+}
+
+export class UserPostResponse extends Response<UserPostRequest> {
+    constructor(msg: UserPostRequest, user: User, public payload = {
+        userName: msg.payload.userName,
+        channels: user.channels.getList().map(({ name, id }) => ({ name, id }))
+    }) { super(msg) }
+}

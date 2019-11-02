@@ -115,12 +115,12 @@ export class RTCClient{
     }
     onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
         if (candidate) {
-            sendMessageToTargetClient(new WebRTCIceCandidate({
-                channel,
-                candidate,
-                from: username,
-                to:this.partner
-            }));
+            // sendMessageToTargetClient(new WebRTCIceCandidate({
+            //     channel,
+            //     candidate,
+            //     from: username,
+            //     to:this.partner
+            // }));
         }
 
     }
@@ -158,11 +158,12 @@ export class RTCClient{
             .then(() => {
                 if(!this.sentOffer){
                     console.log("send offer", this, { PC, ld: PC.localDescription });
-                    let offer = new WebRTCOfferStream({
-                        channel,
-                        from: username,
-                        description: PC.localDescription
-                    })
+                    // let offer = new WebRTCOfferStream({
+                    //     channel,
+                    //     from: username,
+                    //     description: PC.localDescription
+                    // })
+                    let offer = null;
                     this.sentOffer = true;
                     sendMessageToTargetClient(offer)
                     return this.waitForAnswer(PC, username);

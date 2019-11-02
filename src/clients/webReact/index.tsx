@@ -295,13 +295,7 @@ class SocketComponent extends React.Component {
             })
     }
     createTextmessage = () => {
-        const req = new TextMessagePostRequest({
-            body: this.state.msg,
-            destination: {
-                type: DestinationTypes.channel,
-                val: this.state.currentChannel
-            }
-        });
+        const req = new TextMessagePostRequest(this.state.msg,this.state.currentChannel);
         this.sendToServer<TextMessagePostRequest, TextMessagePostResponse>(
             this.state.socket, req, (res) => isResponseTo(req, res, isTextResponse)
         )

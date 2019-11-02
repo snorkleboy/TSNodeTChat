@@ -15,25 +15,34 @@ export enum MessageTypes {
 }
 export enum DestinationTypes {
     channel = "CHANNEL",
-    singleUser = "SINGLEUSER"
+    singleUser = "SINGLE_CHANNELUSER",
+    server = "SERVER"
 }
 export interface MessageLike {
     type: MessageTypes,
     action: ActionTypes
     payload:any
+    destination:Destination
 }
 export interface Request extends MessageLike{
     type: MessageTypes
     action: ActionTypes 
-    payload: any
+    payload: any,
+    destination: Destination
+}
+export type Destination = {
+    type: DestinationTypes,
+    val?: string
 }
 export abstract class Response<Req extends Request> implements MessageLike{
     constructor(req:Req){
         this.type = req.type
         this.action = req.action;
+        this.destination = req.destination
     }
     type: Req["type"];
     action: Req["action"]
+    destination: Destination
     isResponse:boolean = true;
     payload: any
 }

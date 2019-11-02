@@ -42269,7 +42269,6 @@ const ReactDOM = __importStar(__webpack_require__(/*! react-dom */ "./node_modul
 __webpack_require__(/*! ./main.css */ "./src/clients/webReact/main.css");
 const socket_io_client_1 = __importDefault(__webpack_require__(/*! socket.io-client */ "./node_modules/socket.io-client/lib/index.js"));
 const messages_1 = __webpack_require__(/*! ../../lib/messages/messages */ "./src/lib/messages/messages.ts");
-const message_1 = __webpack_require__(/*! ../../lib/messages/message */ "./src/lib/messages/message.ts");
 const streamAwaiter_1 = __webpack_require__(/*! ../tcpClient/streamAwaiter */ "./src/clients/tcpClient/streamAwaiter.ts");
 const socket_1 = __webpack_require__(/*! ../../lib/store/sockets/socket */ "./src/lib/store/sockets/socket.ts");
 const newline_1 = __webpack_require__(/*! ../../lib/util/newline */ "./src/lib/util/newline.ts");
@@ -42444,13 +42443,7 @@ class SocketComponent extends React.Component {
             });
         };
         this.createTextmessage = () => {
-            const req = new messages_1.TextMessagePostRequest({
-                body: this.state.msg,
-                destination: {
-                    type: message_1.DestinationTypes.channel,
-                    val: this.state.currentChannel
-                }
-            });
+            const req = new messages_1.TextMessagePostRequest(this.state.msg, this.state.currentChannel);
             this.sendToServer(this.state.socket, req, (res) => isResponseTo(req, res, isTextResponse))
                 .then(r => this.setState({
                 msgs: [...this.state.msgs, `${newline_1.newLineArt(r.payload.from.name, this.state.currentChannel)} ${r.payload.body}`],
@@ -42629,12 +42622,12 @@ class RTCClient {
         });
         this.onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
             if (candidate) {
-                sendMessageToTargetClient(new messages_1.WebRTCIceCandidate({
-                    channel,
-                    candidate,
-                    from: username,
-                    to: this.partner
-                }));
+                // sendMessageToTargetClient(new WebRTCIceCandidate({
+                //     channel,
+                //     candidate,
+                //     from: username,
+                //     to:this.partner
+                // }));
             }
         };
         this.waitForAnswer = (PC, username) => this.streamAwaiter.waitFor((msg) => msg.isResponse &&
@@ -42670,11 +42663,12 @@ class RTCClient {
                 .then(() => {
                 if (!this.sentOffer) {
                     console.log("send offer", this, { PC, ld: PC.localDescription });
-                    let offer = new messages_1.WebRTCOfferStream({
-                        channel,
-                        from: username,
-                        description: PC.localDescription
-                    });
+                    // let offer = new WebRTCOfferStream({
+                    //     channel,
+                    //     from: username,
+                    //     description: PC.localDescription
+                    // })
+                    let offer = null;
                     this.sentOffer = true;
                     sendMessageToTargetClient(offer);
                     return this.waitForAnswer(PC, username);
@@ -42784,13 +42778,15 @@ var MessageTypes;
 var DestinationTypes;
 (function (DestinationTypes) {
     DestinationTypes["channel"] = "CHANNEL";
-    DestinationTypes["singleUser"] = "SINGLEUSER";
+    DestinationTypes["singleUser"] = "SINGLE_CHANNELUSER";
+    DestinationTypes["server"] = "SERVER";
 })(DestinationTypes = exports.DestinationTypes || (exports.DestinationTypes = {}));
 class Response {
     constructor(req) {
         this.isResponse = true;
         this.type = req.type;
         this.action = req.action;
+        this.destination = req.destination;
     }
 }
 exports.Response = Response;
@@ -42810,27 +42806,16 @@ exports.Response = Response;
 Object.defineProperty(exports, "__esModule", { value: true });
 const message_1 = __webpack_require__(/*! ./message */ "./src/lib/messages/message.ts");
 const store_1 = __webpack_require__(/*! ../store/store */ "./src/lib/store/store.ts");
-class UserPostRequest {
-    constructor(payload) {
-        this.payload = payload;
-        this.type = message_1.MessageTypes.login;
-        this.action = message_1.ActionTypes.post;
-    }
-}
-exports.UserPostRequest = UserPostRequest;
-class UserPostResponse extends message_1.Response {
-    constructor(msg, user, payload = {
-        userName: msg.payload.userName,
-        channels: user.channels.getList().map(({ name, id }) => ({ name, id }))
-    }) {
-        super(msg);
-        this.payload = payload;
-    }
-}
-exports.UserPostResponse = UserPostResponse;
+const serverDestination = { type: message_1.DestinationTypes.server };
 class TextMessagePostRequest {
-    constructor(payload) {
+    constructor(body, channel, payload = {
+        body
+    }, destination = {
+        type: message_1.DestinationTypes.channel,
+        val: channel
+    }) {
         this.payload = payload;
+        this.destination = destination;
         this.type = message_1.MessageTypes.textMessage;
         this.action = message_1.ActionTypes.post;
     }
@@ -42850,8 +42835,9 @@ class TextMessagePostResponse extends message_1.Response {
 }
 exports.TextMessagePostResponse = TextMessagePostResponse;
 class ChannelPostRequest {
-    constructor(payload) {
+    constructor(payload, destination = serverDestination) {
         this.payload = payload;
+        this.destination = destination;
         this.type = message_1.MessageTypes.channelCommand;
         this.action = message_1.ActionTypes.post;
     }
@@ -42869,8 +42855,9 @@ class ChannelPostResponse extends message_1.Response {
 }
 exports.ChannelPostResponse = ChannelPostResponse;
 class ChannelGetRequest {
-    constructor(payload = undefined) {
+    constructor(payload = undefined, destination = serverDestination) {
         this.payload = payload;
+        this.destination = destination;
         this.type = message_1.MessageTypes.channelCommand;
         this.action = message_1.ActionTypes.get;
     }
@@ -42886,16 +42873,18 @@ class ChannelGetResponse extends message_1.Response {
 }
 exports.ChannelGetResponse = ChannelGetResponse;
 class WebRTCIceCandidate {
-    constructor(payload) {
+    constructor(payload, destination) {
         this.payload = payload;
+        this.destination = destination;
         this.type = message_1.MessageTypes.WRTCAV;
         this.action = message_1.ActionTypes.meta;
     }
 }
 exports.WebRTCIceCandidate = WebRTCIceCandidate;
 class WebRTCOfferStream {
-    constructor(payload) {
+    constructor(payload, destination) {
         this.payload = payload;
+        this.destination = destination;
         this.type = message_1.MessageTypes.WRTCAV;
         this.action = message_1.ActionTypes.offer;
     }
@@ -42913,6 +42902,25 @@ class WebRTCAnswerStream extends message_1.Response {
     }
 }
 exports.WebRTCAnswerStream = WebRTCAnswerStream;
+class UserPostRequest {
+    constructor(payload, destination = serverDestination) {
+        this.payload = payload;
+        this.destination = destination;
+        this.type = message_1.MessageTypes.login;
+        this.action = message_1.ActionTypes.post;
+    }
+}
+exports.UserPostRequest = UserPostRequest;
+class UserPostResponse extends message_1.Response {
+    constructor(msg, user, payload = {
+        userName: msg.payload.userName,
+        channels: user.channels.getList().map(({ name, id }) => ({ name, id }))
+    }) {
+        super(msg);
+        this.payload = payload;
+    }
+}
+exports.UserPostResponse = UserPostResponse;
 
 
 /***/ }),
@@ -43216,13 +43224,8 @@ class TCPSocketWrapper extends SocketWrapper {
         this.onDataNotJson = (m, next) => {
             console.error("raw client message, PARTAILLY IMPLIMENTED", { m });
             const str = m.toString();
-            const json = new messages_1.TextMessagePostRequest({
-                body: str,
-                destination: {
-                    type: message_1.DestinationTypes.channel,
-                    val: (c => c ? c.name : "all")(this.user.channels.getList[0])
-                }
-            });
+            const channel = (c => c ? c.name : "all")(this.user.channels.getList[0]);
+            const json = new messages_1.TextMessagePostRequest(str, channel);
             console.log(this.user.channels.getList[0]);
             next(json);
         };

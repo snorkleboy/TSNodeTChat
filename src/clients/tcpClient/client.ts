@@ -136,13 +136,7 @@ class Client{
         channelName:name,
         switchTo
     })
-    makeTextMessage = (msg: string) => new TextMessagePostRequest({
-        body:msg,
-        destination:{
-            type:DestinationTypes.channel,
-            val:this.state.channel.name
-        }
-    })
+    makeTextMessage = (msg: string) => new TextMessagePostRequest(msg,this.state.channel.name)
 }
 
 export const startClient = (port,address)=>{

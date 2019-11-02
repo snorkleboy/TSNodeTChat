@@ -115,13 +115,8 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     private onDataNotJson = (m,next)=>{
         console.error("raw client message, PARTAILLY IMPLIMENTED",{m});
         const str = m.toString();
-        const json = new TextMessagePostRequest({
-            body:str,
-            destination:{
-                type:DestinationTypes.channel,
-                val: (c => c ? c.name : "all")(this.user.channels.getList[0])
-            }
-        })
+        const channel = (c => c ? c.name : "all")(this.user.channels.getList[0]);
+        const json = new TextMessagePostRequest(str,channel)
         console.log(this.user.channels.getList[0]);
         next(json);
     }

@@ -37,10 +37,7 @@ serverWrapper.listen(listenOptions, () => console.log(`listenting on ${listenOpt
 process.openStdin().on(
     'data',
     keyBoardLine => store.forEachSocket(socket => socket.write(new TextMessagePostResponse(
-            new TextMessagePostRequest({
-                body: keyBoardLine,
-                destination: { type: DestinationTypes.channel, val: "all" } 
-            })
+            new TextMessagePostRequest(keyBoardLine,"all")
             ,User.serverUser
         )
     ))
