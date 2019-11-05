@@ -17,7 +17,7 @@ export const socketHandler = async (
             .addChannel(Store.defaultChannel);
         console.log(Object.entries(Store.getStore().users.store).map(([k, u]) => ({ name: u.username, sockets:Object.values(u.sockets.store)})))
 
-        socketWrapper.configure(user, store, messageHandler);
+        socketWrapper.configure(user, messageHandler);
         socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
         const joinChannelMessage = new ChannelPostResponse(
             new ChannelPostRequest({

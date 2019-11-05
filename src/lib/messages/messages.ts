@@ -1,4 +1,5 @@
-import { Request, Response,ActionTypes,DestinationTypes,MessageTypes, Destination} from "./message";
+import { Request, Response, ActionTypes, DestinationTypes, MessageTypes, Destination, EchoResponse, ServerDestination, SingleUserDestination, ChannelDestination } from "./message";
+
 import { User } from "../store/user/user";
 import { Store } from "../store/store";
 export type HandledRequests =
@@ -7,10 +8,16 @@ export type HandledRequests =
     | ChannelGetRequest
     | WebRTCIceCandidate
     | WebRTCOfferStream
+    | WebRTCAnswerOffer
+    | WebRTCRenegotiateStream
 
-export type HandledResponses = TextMessagePostResponse | ChannelPostResponse | WebRTCAnswerStream;
-const serverDestination = { type: DestinationTypes.server }
-
+export type HandledResponses = TextMessagePostResponse 
+    | ChannelPostResponse 
+    | ChannelGetResponse
+    | WebRTCOfferStreamResponse
+    | WebRTCRenegotiateResponse
+    | WebRTCAnswerOfferResponse
+;
 export class TextMessagePostRequest implements Request {
     type: MessageTypes.textMessage = MessageTypes.textMessage
     action: ActionTypes.post = ActionTypes.post
@@ -20,7 +27,7 @@ export class TextMessagePostRequest implements Request {
         }, 
         public destination: Destination = {
             type:DestinationTypes.channel,
-            val:channel
+            val:{channel}
         }
     ) { }
 }
@@ -40,16 +47,17 @@ export class ChannelPostRequest implements Request {
     constructor(
         public payload: {
             channelName: string,
-            switchTo: boolean
+            switchTo?: boolean,
         }, 
-        public destination: Destination = serverDestination
+        public destination: Destination = ServerDestination
     ) { }
 }
 export class ChannelPostResponse extends Response<ChannelPostRequest> {
-    constructor(msg: ChannelPostRequest, user: User, public payload = {
+    constructor(msg: ChannelPostRequest, user: User,isNew=false,leftChannel=false, public payload = {
         channelName: msg.payload.channelName,
         userThatJoined: user.username,
-        isNew:false
+        isNew,
+        leftChannel
     }) { super(msg) }
 }
 export class ChannelGetRequest implements Request {
@@ -57,7 +65,7 @@ export class ChannelGetRequest implements Request {
     action: ActionTypes.get = ActionTypes.get
     constructor(
         public payload = undefined,
-        public destination: Destination = serverDestination
+        public destination: Destination = ServerDestination
     ) { }
 }
 
@@ -73,33 +81,64 @@ export class WebRTCIceCandidate implements Request {
     action: ActionTypes.meta = ActionTypes.meta
     constructor(public payload: {
         candidate: any,
-        channel:string,
-        to:string,
         from:string
     }, 
-    public destination: Destination) { }
+    channel,
+    user,
+    public destination: Destination={
+        type:DestinationTypes.singleUser,
+        val:{
+            channel,user
+        }
+    }) { }
 }
 export class WebRTCOfferStream implements Request{
     type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
     action: ActionTypes.offer = ActionTypes.offer
     constructor(public payload : {
-        channel:string,
         description:any,
         from:string,
-        renegotation?:{
-            to:string,
-        }
+        // renegotation?:{
+        //     to:string,
+        // }
     },
-    public destination: Destination) { }
+    public destination: SingleUserDestination|ChannelDestination) { }
 }
-export class WebRTCAnswerStream extends Response<WebRTCOfferStream> {
-    constructor(msg: WebRTCOfferStream, user:{username:string},desc: any, public payload = {
-        description: desc,
-        channel: msg.payload.channel,
-        offerFrom:msg.payload.from,
-        answerFrom:user.username
-    }) { super(msg) }
+export class WebRTCOfferStreamResponse extends EchoResponse<WebRTCOfferStream>{}
+export class WebRTCRenegotiateStream implements Request {
+    type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
+    action: ActionTypes.patch = ActionTypes.patch
+    constructor(
+        public payload: {
+            description: any,
+            from: string
+        },
+        channel,
+        otherUser:string,
+            public destination: Destination = {
+                type:DestinationTypes.singleUser,
+                val: { user: otherUser, channel}
+            }
+    ){}
 }
+export class WebRTCRenegotiateResponse extends EchoResponse<WebRTCRenegotiateStream>{ }
+
+export class WebRTCAnswerOffer implements Request {
+    type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
+    action: ActionTypes.offer = ActionTypes.offer
+    constructor(msg: WebRTCOfferStreamResponse, user:{username:string},desc: any, 
+        public payload = {
+            description: desc,
+            originalOfferFrom:msg.payload.from,
+            answerFrom:user.username
+        },
+        public destination = {
+            type:DestinationTypes.singleUser,
+            val:{user:msg.payload.from,channel:msg.destination.val.channel}
+        }
+    ) {}
+}
+export class WebRTCAnswerOfferResponse extends EchoResponse<WebRTCAnswerOffer>{ }
 
 export class UserPostRequest implements Request {
     type: MessageTypes.login = MessageTypes.login
@@ -107,12 +146,12 @@ export class UserPostRequest implements Request {
     constructor(public payload: {
         userName: string,
     },
-    public destination: Destination = serverDestination) { }
+    public destination: Destination = ServerDestination) { }
 }
 
 export class UserPostResponse extends Response<UserPostRequest> {
     constructor(msg: UserPostRequest, user: User, public payload = {
         userName: msg.payload.userName,
-        channels: user.channels.getList().map(({ name, id }) => ({ name, id }))
+        channels: user.channels.getList().map((c) => ({ name:c.name, id:c.id,users:c.getUserList().map(u=>u.username) }))
     }) { super(msg) }
 }

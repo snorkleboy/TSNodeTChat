@@ -9,8 +9,8 @@ import { HandledRequests, TextMessagePostRequest, TextMessagePostResponse } from
 import { DestinationTypes, MessageLike, MessageTypes, ActionTypes } from "../../messages/message";
 import { newLineArt } from "../../util/newline";
 
-
-const  configureSocket = function(user: User, store: Store, messageHandler: MessageHandlerGen<HandledRequests>) {
+type ConfigureSocket = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>void;
+const configureSocket: ConfigureSocket = function(user: User, messageHandler: MessageHandlerGen<HandledRequests>) {
     const destroy = (e) => {
         console.log('destroying socket connection with the client',{e});
         user.removeSocket(this);
@@ -27,7 +27,7 @@ const  configureSocket = function(user: User, store: Store, messageHandler: Mess
     this.on('data', (msg) => {
         try {
             console.log("received message",{msg});
-            messageHandler(msg, store, user);
+            messageHandler(msg, user);
         } catch (error) {
             console.error("message handle error", { error, msg });
         }
@@ -42,7 +42,7 @@ export type RawSocket = TCPSocket | Websocket
 export type WrappedSocket = TCPSocketWrapper | WebSocketWrapper | FakeServerSocket
 export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
     constructor(public socket: T,public id:number){};
-    public configure = configureSocket.bind(this);
+    public configure: ConfigureSocket = configureSocket.bind(this);
     abstract write:(msg:MessageLike)=>void;
     abstract on:(event:string,cb)=>void;
     abstract once:(event:string,cb)=>void;
@@ -74,9 +74,8 @@ User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     isJson:Boolean;
     user: User;
-    configure = (user: User, store: Store, messageHandler: MessageHandlerGen<HandledRequests>)=>{
-        configureSocket.bind(this)(user, store, messageHandler);
-        
+    configure = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>{
+        configureSocket.bind(this)(user, messageHandler);
     }
     write = (msg:MessageLike)=>{
         if(this.isJson){
@@ -153,7 +152,7 @@ export const websocketMessageEventName = "data";
 const renamer = (e)=>{
     let renamedEvent = e;
     if (e === "close") {
-        renamedEvent = "dissconnect";
+        renamedEvent = "disconnect";
     }
     return renamedEvent
 }
@@ -179,5 +178,7 @@ export class WebSocketWrapper extends SocketWrapper<Websocket>{
         }
     }
     getIdentity = () => websocketIdentityGetter(this);
-    destroy = ()=>{};
+    destroy = ()=>{
+
+    };
 }

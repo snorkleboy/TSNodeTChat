@@ -42273,9 +42273,6 @@ const streamAwaiter_1 = __webpack_require__(/*! ../tcpClient/streamAwaiter */ ".
 const socket_1 = __webpack_require__(/*! ../../lib/store/sockets/socket */ "./src/lib/store/sockets/socket.ts");
 const newline_1 = __webpack_require__(/*! ../../lib/util/newline */ "./src/lib/util/newline.ts");
 const rtcHandler_1 = __webpack_require__(/*! ./rtcHandler */ "./src/clients/webReact/rtcHandler.ts");
-const Hello = (props) => (React.createElement("section", null,
-    React.createElement(SocketComponent, null)));
-console.log({ websocketMessageEventName: socket_1.websocketMessageEventName });
 const isChannelPostResponse = (msg) => !!msg.payload.userThatJoined;
 const isLoginResponse = (msg) => !!(msg.payload.userName);
 const isResponseTo = (req, res, otherCheck) => !!(otherCheck(res) && res.type === req.type && res.action === req.action);
@@ -42288,12 +42285,14 @@ class SocketComponent extends React.Component {
             msg: "",
             msgs: [],
             channels: [],
+            channelsObj: {},
+            currentChannelUsers: [],
             currentChannel: null,
             auth: false,
-            userName: "websocket U " + Date.now() % 1000,
-            PC: null,
+            userName: "wsU " + Date.now() % 1000,
+            vcManager: null,
             localStream: null,
-            partners: {}
+            partners: {},
         };
         this.streamAwaiter = new streamAwaiter_1.StreamAwaiter();
         this.sendToServer = (socket, msg, checker = null) => {
@@ -42335,7 +42334,7 @@ class SocketComponent extends React.Component {
                         console.log('json parse error', { msg, error });
                     }
                 }
-                // (msg as any).action !== "META" && console.log("recieved", { msg });
+                msg.action !== "META" && console.log("recieved", { msg });
                 if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
                     this.setState({
                         msgs: [...this.state.msgs, `${newline_1.newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
@@ -42343,16 +42342,36 @@ class SocketComponent extends React.Component {
                 }
                 if (isChannelPostResponse(msg) && msg.payload.channelName) {
                     msg = msg;
+                    let { currentChannelUsers, channelsObj } = this.state;
                     const channelName = msg.payload.channelName;
                     const userThatJoined = msg.payload.userThatJoined;
                     const displayName = userThatJoined === this.state.userName ? "You" : userThatJoined;
                     let channels = this.state.channels;
-                    if (!this.state.channels.some(c => c === channelName)) {
+                    const userLeftChannel = msg.payload.leftChannel;
+                    const channelObj = channelsObj[channelName];
+                    if (!this.state.channelsObj[channelName]) {
                         channels = [...this.state.channels, msg.payload.channelName];
                     }
+                    else if (userThatJoined !== this.state.userName) {
+                        if (userLeftChannel) {
+                            currentChannelUsers = remove(channelObj.users, userThatJoined);
+                            if (channelObj) {
+                                channelsObj[channelName] = Object.assign(Object.assign({}, channelObj), { users: currentChannelUsers });
+                            }
+                        }
+                        else {
+                            currentChannelUsers = [...channelObj.users, userThatJoined];
+                            if (channelObj) {
+                                channelsObj[channelName] = Object.assign(Object.assign({}, channelObj), { users: currentChannelUsers });
+                            }
+                        }
+                    }
+                    console.log({ state: this.state, userLeftChannel, userThatJoined, channelObj });
                     this.setState({
-                        msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
-                        channels
+                        msgs: [...this.state.msgs, `${displayName} ${userLeftChannel ? "left" : "joined"} ${msg.payload.channelName}`],
+                        channels,
+                        currentChannelUsers,
+                        channelsObj
                     });
                 }
                 this.streamAwaiter.onData(msg);
@@ -42380,7 +42399,7 @@ class SocketComponent extends React.Component {
         };
         this.startRTC = () => {
             const that = this;
-            const PC = new rtcHandler_1.RTCClientManager(that.state.userName, () => that.state.currentChannel, this.streamAwaiter, this.getVideoStream, (msg, checker) => that.sendToServer(that.state.socket, msg, checker), (e, partner) => {
+            const vcManager = new rtcHandler_1.RTCClientManager(that.state.userName, () => that.state.currentChannel, this.streamAwaiter, this.getVideoStream, (msg, checker) => that.sendToServer(that.state.socket, msg, checker), (e, partner) => {
                 console.log("on track callback", { e, partner, partners: this.state.partners });
                 this.getVideoStream()
                     .then(s => this.startLocalVideo(s));
@@ -42391,11 +42410,13 @@ class SocketComponent extends React.Component {
                         } })
                 });
             });
-            that.setState({ PC });
+            that.setState({ vcManager });
         };
         this.startVideoChat = () => __awaiter(this, void 0, void 0, function* () {
             console.log("start video chat");
-            yield this.state.PC.start();
+            const partners = remove(this.state.currentChannelUsers, this.state.userName);
+            console.log({ partners, username: this.state.userName });
+            yield this.state.vcManager.broadCastOffer(partners);
             document.title = "[P]" + document.title;
             this.startLocalVideo(yield this.getVideoStream());
         });
@@ -42409,7 +42430,9 @@ class SocketComponent extends React.Component {
                 console.log(this.state),
                 React.createElement("div", { className: "channelBox" },
                     React.createElement("div", null, "channels"),
-                    React.createElement("div", null, this.state.channels.map(c => (React.createElement("div", { onClick: () => this.createChannelPostMessage(c) }, c))))),
+                    React.createElement("div", null, Object.entries(this.state.channelsObj).map(([name, c]) => (React.createElement("div", { onClick: () => this.createChannelPostMessage(name) },
+                        React.createElement("label", null, name),
+                        React.createElement("ul", null, c.users.map(u => React.createElement("li", null, u.slice(0, 10))))))))),
                 React.createElement("div", { className: "messageBox flex-column" },
                     React.createElement("ul", null, this.state.msgs.map(m => React.createElement("li", null, m))),
                     React.createElement("div", { className: "messageBox-input flex-row" },
@@ -42425,6 +42448,8 @@ class SocketComponent extends React.Component {
         this.login = (socket) => this.sendToServer(socket, new messages_1.UserPostRequest({ userName: this.state.userName }), m => isLoginResponse(m)).then(msg => this.setState({
             auth: true,
             channels: msg.payload.channels.map(c => c.name),
+            channelsObj: ((c) => { const obj = {}; c.forEach(c => obj[c.name] = c); return obj; })(msg.payload.channels),
+            currentChannelUsers: msg.payload.channels[0].users,
             currentChannel: msg.payload.channels[0].name
         })).then(() => console.log("login recieved")).catch(e => console.log("didnt recive login in time", { e }));
         this.createChannelPostMessage = (c) => {
@@ -42458,7 +42483,7 @@ class SocketComponent extends React.Component {
             this.configureSocket()
                 .then(() => {
                 that.startRTC();
-                document.title = this.state.userName.split("websocket")[1];
+                document.title = this.state.userName;
             })
                 .catch(function (e) {
                 console.log("Something went wrong!", { e });
@@ -42478,8 +42503,12 @@ class SocketComponent extends React.Component {
         }
     }
 }
+const remove = (arr, el) => {
+    const i = arr.indexOf(el);
+    return [...arr.slice(0, i), ...arr.slice(i + 1, arr.length)];
+};
 document.addEventListener("DOMContentLoaded", () => {
-    ReactDOM.render(React.createElement(Hello, { compiler: "TypeScript", framework: "React" }), document.getElementById("root"));
+    ReactDOM.render(React.createElement(SocketComponent, null), document.getElementById("root"));
 });
 
 
@@ -42532,168 +42561,119 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const messages_1 = __webpack_require__(/*! ../../lib/messages/messages */ "./src/lib/messages/messages.ts");
+const message_1 = __webpack_require__(/*! ../../lib/messages/message */ "./src/lib/messages/message.ts");
 const configuration = {
     iceServers: [{
             urls: 'stun:stun.l.google.com:19302' // Google's public STUN server
         }]
 };
-class RTCClient {
-    constructor(username, channel, streamAwaiter, getVideoStream, sendMessageToTargetClient, onTrackReceived, onExtraPartner = null, onPartner = null) {
+class PartnerConnection {
+    constructor(username, channel, partner, streamAwaiter, getVideoStream, sendMessageToTargetClient, onTrackReceived) {
         this.username = username;
         this.channel = channel;
+        this.partner = partner;
         this.streamAwaiter = streamAwaiter;
         this.getVideoStream = getVideoStream;
         this.sendMessageToTargetClient = sendMessageToTargetClient;
         this.onTrackReceived = onTrackReceived;
-        this.onExtraPartner = onExtraPartner;
-        this.onPartner = onPartner;
-        this.forCandidates = [];
-        this.PC = null;
-        this.isInitiator = false;
-        this.sentOffer = false;
-        this.offering = false;
-        this.recievedOffer = false;
-        this.partner = null;
+        this.partnerIceCandidates = [];
         this.startOffering = () => __awaiter(this, void 0, void 0, function* () {
-            console.log("start offering", !this.isInitiator && !this.offering, this);
-            if (!this.isInitiator && !this.offering) {
-                const stream = yield this.getVideoStream();
-                this.offering = true;
-                stream.getTracks().forEach((track) => this.PC.addTrack(track, stream));
-                return stream;
-            }
-        });
-        this.startStream = (onPartner = null) => __awaiter(this, void 0, void 0, function* () {
-            const stream = yield this.startOffering();
-            if (onPartner) {
-                this.onPartner = onPartner;
-            }
-            this.isInitiator = true;
+            console.log("start offering", this);
+            const stream = yield this.getVideoStream();
+            stream.getTracks().forEach((track) => this.PC.addTrack(track, stream));
             return stream;
         });
-        this.waitForIce = (streamAwaiter, PC, forCandidates, username) => {
-            console.log("wait for ice", this);
-            streamAwaiter.waitFor(m => {
-                if (m.payload.candidate &&
-                    m.payload.to === this.username &&
-                    m.payload.from === this.partner) {
-                    console.log("candidate", { m, this: this, partner: this.partner }, m.payload.candidate && m.payload.from === this.partner);
-                    return true;
-                }
-            }).then(ice => {
-                console.log("got ice", { ice }, this);
-                const candidate = ice.payload.candidate;
-                if (candidate) {
-                    if (PC.remoteDescription) {
-                        console.log("adding candidate", { candidate }, this);
-                        // this.forCandidates.push(candidate);
-                        PC.addIceCandidate(candidate);
-                    }
-                    else {
-                        forCandidates.push(candidate);
-                    }
-                }
-                this.waitForIce(streamAwaiter, PC, forCandidates, username);
-            }).catch(e => console.log("receive offer went wront", { e }));
-        };
         this.onOffer = (msg) => __awaiter(this, void 0, void 0, function* () {
-            if (this.recievedOffer && (this.partner && !(msg.payload.renegotation && msg.payload.renegotation.to === this.username))) {
-                console.log("swallow reciegd offer", { msg, this: this });
-                return;
-            }
-            this.recievedOffer = true;
-            this.partner = msg.payload.from;
             const PC = this.PC;
             console.log("on recieve offer create answer", this, { cs: PC.signalingState, PC, msg });
-            yield PC.setRemoteDescription(msg.payload.description).catch(e => console.error("ONOFFER couldnt set remote description", { msg }));
-            if (this.forCandidates.length > 0) {
-                console.log("receiveOffer - adding candidates");
-                this.forCandidates.forEach(c => {
-                    PC.addIceCandidate(c);
-                });
-            }
+            this.foreignDescription = msg.payload.description;
+            yield PC.setRemoteDescription(this.foreignDescription)
+                .catch(e => console.error("ONOFFER couldnt set remote description", { e, this: this, msg }));
+            this.addCandidatesToPC();
             const ans = yield PC.createAnswer();
-            yield PC.setLocalDescription(ans);
-            const username = this.username;
-            const res = new messages_1.WebRTCAnswerStream(msg, { username }, PC.localDescription);
+            this.localDescription = ans;
+            yield PC.setLocalDescription(this.localDescription);
+            const res = new messages_1.WebRTCAnswerOffer(msg, { username: this.username }, PC.localDescription);
             console.log("sending answer", { res });
             this.sendMessageToTargetClient(res);
             this.startOffering();
         });
-        this.onicecandidate = (sendMessageToTargetClient, username, channel) => ({ candidate }) => {
-            if (candidate) {
-                // sendMessageToTargetClient(new WebRTCIceCandidate({
-                //     channel,
-                //     candidate,
-                //     from: username,
-                //     to:this.partner
-                // }));
-            }
+        this.onTrack = (e) => {
+            console.log("PC.ontrack", { this: this, cs: this.PC.iceGatheringState, e });
+            this.addCandidatesToPC();
+            this.onTrackReceived(e, this.partner);
         };
-        this.waitForAnswer = (PC, username) => this.streamAwaiter.waitFor((msg) => msg.isResponse &&
-            msg.payload.description &&
-            msg.payload.offerFrom === username &&
-            (!this.partner || (this.partner && msg.payload.answerFrom === this.partner))).then((answer) => {
-            let ret;
-            console.log("received answer", { answer, cs: PC.signalingState });
-            if (this.partner && this.partner !== answer.payload.answerFrom) {
-                console.log("extra partner going back to manager", this, answer);
-                ret = setTimeout(() => {
-                    this.onExtraPartner(answer);
-                }, 1500);
-            }
-            else {
-                this.partner = answer.payload.answerFrom;
-                console.log("answer negotation partner setRemoteDesc", { this: this, answer });
-                if (this.onPartner) {
-                    this.onPartner(this.partner, answer);
-                }
-                ret = PC.setRemoteDescription(answer.payload.description).catch(e => console.error("ON ASWERtry set remote desc failed", { answer, e, this: this }));
-            }
-            this.waitForAnswer(PC, username);
-            return ret;
-        });
-        this.onnegotiationneeded = (sendMessageToTargetClient, PC, channel, username) => () => __awaiter(this, void 0, void 0, function* () {
-            console.log("onnegotiationneeded, try send offer", { partner: this.partner }, this);
-            PC.createOffer()
+        this.sendOffer = () => __awaiter(this, void 0, void 0, function* () {
+            return this.PC.createOffer()
                 .then(offer => {
-                console.log("set local description (negotation needed)", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
-                return PC.setLocalDescription(offer);
+                this.localDescription = offer;
+                const PC = this.PC;
+                console.log("onnegotiationneeded set local description", { cs: PC.connectionState, PC, ld: PC.localDescription, ldl: PC.currentLocalDescription });
+                return this.PC.setLocalDescription(this.localDescription);
             })
                 .then(() => {
-                if (!this.sentOffer) {
-                    console.log("send offer", this, { PC, ld: PC.localDescription });
-                    // let offer = new WebRTCOfferStream({
-                    //     channel,
-                    //     from: username,
-                    //     description: PC.localDescription
-                    // })
-                    let offer = null;
-                    this.sentOffer = true;
-                    sendMessageToTargetClient(offer);
-                    return this.waitForAnswer(PC, username);
-                }
+                const offer = new messages_1.WebRTCOfferStream({
+                    from: this.username,
+                    description: this.PC.localDescription
+                }, {
+                    type: message_1.DestinationTypes.singleUser,
+                    val: { channel: this.channel, user: this.partner }
+                });
+                const PC = this.PC;
+                console.log("onnegotiationneeded send offer", this, { offer, PC, ld: PC.localDescription });
+                this.sendMessageToTargetClient(offer);
             })
-                .catch(e => console.error("negotaiotn needed", { e }));
+                .then(() => this.streamAwaiter.waitFor((msg) => (msg.payload.description &&
+                msg.payload.originalOfferFrom === this.username &&
+                msg.payload.answerFrom === this.partner)))
+                .then((answer) => {
+                console.log("onnegotiationneeded received answer", { answer, cs: this.PC.signalingState });
+                this.foreignDescription = answer.payload.description;
+                return this.PC.setRemoteDescription(this.foreignDescription)
+                    .catch(e => console.error("ON ASWERtry set remote desc failed", { answer, e, this: this }));
+            });
         });
-        this.PC = new RTCPeerConnection(configuration);
-        this.PC.onicecandidate = this.onicecandidate(sendMessageToTargetClient, username, channel).bind(this);
-        this.PC.onnegotiationneeded = this.onnegotiationneeded(sendMessageToTargetClient, this.PC, channel, username);
-        this.PC.ontrack = (e) => {
-            console.log("PC.ontrack", { this: this, cs: this.PC.iceGatheringState, e });
-            if (this.forCandidates.length > 0 && this.PC.iceGatheringState !== "completed") {
-                this.forCandidates.forEach(c => {
-                    console.log("receiveOffer - adding candidates", { c });
+        this.addCandidatesToPC = () => {
+            if (this.partnerIceCandidates.length > 0) { // && this.PC.iceGatheringState !== "completed"
+                console.log("adding candidates");
+                this.partnerIceCandidates.forEach(c => {
                     this.PC.addIceCandidate(c);
                 });
             }
-            onTrackReceived(e, this.partner);
         };
-        this.waitForIce(streamAwaiter, this.PC, this.forCandidates, username);
-        // this.waitForRTCOffer(streamAwaiter, this.PC, this.forCandidates, username, this.startOffering, sendMessageToTargetClient);
+        this.sendIceCandidate = ({ candidate }) => {
+            const { sendMessageToTargetClient, username, channel } = this;
+            if (candidate) {
+                sendMessageToTargetClient(new messages_1.WebRTCIceCandidate({
+                    candidate,
+                    from: username,
+                }, channel, this.partner));
+            }
+        };
+        this.waitForIce = () => this.streamAwaiter
+            .waitFor((m) => (m.payload.candidate &&
+            m.payload.from === this.partner))
+            .then(ice => {
+            console.log("wait for ice got ice", { ice, partners: this.partnerIceCandidates, this: this });
+            const candidate = ice.payload.candidate;
+            if (candidate) {
+                if (this.PC.remoteDescription) {
+                    this.PC.addIceCandidate(candidate);
+                }
+                else {
+                    this.partnerIceCandidates.push(candidate);
+                }
+            }
+        })
+            .catch(e => console.log("receive ice error", { e }))
+            .then(() => this.waitForIce());
+        this.PC = new RTCPeerConnection(configuration);
+        this.PC.onicecandidate = this.sendIceCandidate;
+        this.PC.onnegotiationneeded = this.sendOffer;
+        this.PC.ontrack = this.onTrack;
+        this.waitForIce();
     }
 }
-exports.RTCClient = RTCClient;
 class RTCClientManager {
     constructor(username, getChannel, streamAwaiter, getVideoStream, sendMessageToTargetClient, onTrackReceived) {
         this.username = username;
@@ -42703,43 +42683,35 @@ class RTCClientManager {
         this.sendMessageToTargetClient = sendMessageToTargetClient;
         this.onTrackReceived = onTrackReceived;
         this.connections = {};
-        this.initiator = null;
         this.waitForRTCOffer = () => {
             const that = this;
-            this.streamAwaiter.waitFor(m => {
-                if (m.payload.description && !m.isResponse && m.payload.from !== this.username) {
-                    return true;
-                }
-            }).then((msg) => __awaiter(this, void 0, void 0, function* () {
+            this.streamAwaiter.waitFor(m => m.payload.description &&
+                !m.payload.originalOfferFrom &&
+                m.isResponse &&
+                m.payload.from !== this.username)
+                .then((msg) => __awaiter(this, void 0, void 0, function* () {
                 const potentialPartner = msg.payload.from;
-                this.gotPotentialPartner(potentialPartner, msg);
                 that.waitForRTCOffer();
+                this.onOffer(potentialPartner, msg);
             })).catch(e => console.log("receive offer went wront", { e }));
         };
-        this.gotPotentialPartner = (potentialPartner, msg) => {
+        this.onOffer = (potentialPartner, msg) => {
             if (!this.connections[potentialPartner]) {
-                console.log("manager got new offer", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
-                const nClient = this.newConnection();
-                // nClient.partner = potentialPartner;
-                this.connections[potentialPartner] = nClient;
+                console.error("manager got new offer from unknown parnter", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
+                this.connections[potentialPartner] = this.newConnection(potentialPartner);
             }
             else {
-                console.warn("manager got offer for existing conection", potentialPartner, { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
+                console.error("manager got offer for existing conection", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
             }
             this.connections[potentialPartner].onOffer(msg);
         };
-        this.newConnection = () => {
-            return new RTCClient(this.username, this.getChannel(), this.streamAwaiter, this.getVideoStream, this.sendMessageToTargetClient, this.onTrackReceived, (msg) => {
-                const potentialPartner = msg.payload.answerFrom;
-                console.log("manager got extra answer", { connections: this.connections, initiator: this.initiator, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this });
-                this.gotPotentialPartner(potentialPartner, msg);
-            });
+        this.newConnection = (partner) => {
+            const conn = new PartnerConnection(this.username, this.getChannel(), partner, this.streamAwaiter, this.getVideoStream, this.sendMessageToTargetClient, this.onTrackReceived);
+            return conn;
         };
-        this.start = () => {
-            this.initiator = this.newConnection();
-            this.initiator.startStream((p, m) => {
-                this.connections[p] = this.initiator;
-            });
+        this.broadCastOffer = (partnerNames) => {
+            console.log("broadcast", { partnerNames });
+            partnerNames.forEach(p => (this.connections[p] = this.newConnection(p)) && this.connections[p].startOffering());
         };
         this.waitForRTCOffer();
     }
@@ -42781,15 +42753,26 @@ var DestinationTypes;
     DestinationTypes["singleUser"] = "SINGLE_CHANNELUSER";
     DestinationTypes["server"] = "SERVER";
 })(DestinationTypes = exports.DestinationTypes || (exports.DestinationTypes = {}));
+exports.ServerDestination = {
+    type: DestinationTypes.singleUser,
+    val: null
+};
 class Response {
-    constructor(req) {
+    constructor(req, type = req.type, action = req.action, destination = req.destination) {
+        this.type = type;
+        this.action = action;
+        this.destination = destination;
         this.isResponse = true;
-        this.type = req.type;
-        this.action = req.action;
-        this.destination = req.destination;
     }
 }
 exports.Response = Response;
+class EchoResponse extends Response {
+    constructor(req, payload = req.payload) {
+        super(req);
+        this.payload = payload;
+    }
+}
+exports.EchoResponse = EchoResponse;
 
 
 /***/ }),
@@ -42806,13 +42789,12 @@ exports.Response = Response;
 Object.defineProperty(exports, "__esModule", { value: true });
 const message_1 = __webpack_require__(/*! ./message */ "./src/lib/messages/message.ts");
 const store_1 = __webpack_require__(/*! ../store/store */ "./src/lib/store/store.ts");
-const serverDestination = { type: message_1.DestinationTypes.server };
 class TextMessagePostRequest {
     constructor(body, channel, payload = {
         body
     }, destination = {
         type: message_1.DestinationTypes.channel,
-        val: channel
+        val: { channel }
     }) {
         this.payload = payload;
         this.destination = destination;
@@ -42835,7 +42817,7 @@ class TextMessagePostResponse extends message_1.Response {
 }
 exports.TextMessagePostResponse = TextMessagePostResponse;
 class ChannelPostRequest {
-    constructor(payload, destination = serverDestination) {
+    constructor(payload, destination = message_1.ServerDestination) {
         this.payload = payload;
         this.destination = destination;
         this.type = message_1.MessageTypes.channelCommand;
@@ -42844,10 +42826,11 @@ class ChannelPostRequest {
 }
 exports.ChannelPostRequest = ChannelPostRequest;
 class ChannelPostResponse extends message_1.Response {
-    constructor(msg, user, payload = {
+    constructor(msg, user, isNew = false, leftChannel = false, payload = {
         channelName: msg.payload.channelName,
         userThatJoined: user.username,
-        isNew: false
+        isNew,
+        leftChannel
     }) {
         super(msg);
         this.payload = payload;
@@ -42855,7 +42838,7 @@ class ChannelPostResponse extends message_1.Response {
 }
 exports.ChannelPostResponse = ChannelPostResponse;
 class ChannelGetRequest {
-    constructor(payload = undefined, destination = serverDestination) {
+    constructor(payload = undefined, destination = message_1.ServerDestination) {
         this.payload = payload;
         this.destination = destination;
         this.type = message_1.MessageTypes.channelCommand;
@@ -42873,7 +42856,12 @@ class ChannelGetResponse extends message_1.Response {
 }
 exports.ChannelGetResponse = ChannelGetResponse;
 class WebRTCIceCandidate {
-    constructor(payload, destination) {
+    constructor(payload, channel, user, destination = {
+        type: message_1.DestinationTypes.singleUser,
+        val: {
+            channel, user
+        }
+    }) {
         this.payload = payload;
         this.destination = destination;
         this.type = message_1.MessageTypes.WRTCAV;
@@ -42890,20 +42878,45 @@ class WebRTCOfferStream {
     }
 }
 exports.WebRTCOfferStream = WebRTCOfferStream;
-class WebRTCAnswerStream extends message_1.Response {
-    constructor(msg, user, desc, payload = {
-        description: desc,
-        channel: msg.payload.channel,
-        offerFrom: msg.payload.from,
-        answerFrom: user.username
+class WebRTCOfferStreamResponse extends message_1.EchoResponse {
+}
+exports.WebRTCOfferStreamResponse = WebRTCOfferStreamResponse;
+class WebRTCRenegotiateStream {
+    constructor(payload, channel, otherUser, destination = {
+        type: message_1.DestinationTypes.singleUser,
+        val: { user: otherUser, channel }
     }) {
-        super(msg);
         this.payload = payload;
+        this.destination = destination;
+        this.type = message_1.MessageTypes.WRTCAV;
+        this.action = message_1.ActionTypes.patch;
     }
 }
-exports.WebRTCAnswerStream = WebRTCAnswerStream;
+exports.WebRTCRenegotiateStream = WebRTCRenegotiateStream;
+class WebRTCRenegotiateResponse extends message_1.EchoResponse {
+}
+exports.WebRTCRenegotiateResponse = WebRTCRenegotiateResponse;
+class WebRTCAnswerOffer {
+    constructor(msg, user, desc, payload = {
+        description: desc,
+        originalOfferFrom: msg.payload.from,
+        answerFrom: user.username
+    }, destination = {
+        type: message_1.DestinationTypes.singleUser,
+        val: { user: msg.payload.from, channel: msg.destination.val.channel }
+    }) {
+        this.payload = payload;
+        this.destination = destination;
+        this.type = message_1.MessageTypes.WRTCAV;
+        this.action = message_1.ActionTypes.offer;
+    }
+}
+exports.WebRTCAnswerOffer = WebRTCAnswerOffer;
+class WebRTCAnswerOfferResponse extends message_1.EchoResponse {
+}
+exports.WebRTCAnswerOfferResponse = WebRTCAnswerOfferResponse;
 class UserPostRequest {
-    constructor(payload, destination = serverDestination) {
+    constructor(payload, destination = message_1.ServerDestination) {
         this.payload = payload;
         this.destination = destination;
         this.type = message_1.MessageTypes.login;
@@ -42914,7 +42927,7 @@ exports.UserPostRequest = UserPostRequest;
 class UserPostResponse extends message_1.Response {
     constructor(msg, user, payload = {
         userName: msg.payload.userName,
-        channels: user.channels.getList().map(({ name, id }) => ({ name, id }))
+        channels: user.channels.getList().map((c) => ({ name: c.name, id: c.id, users: c.getUserList().map(u => u.username) }))
     }) {
         super(msg);
         this.payload = payload;
@@ -43121,7 +43134,7 @@ const identityGetter_1 = __webpack_require__(/*! ./identityGetter */ "./src/lib/
 const messages_1 = __webpack_require__(/*! ../../messages/messages */ "./src/lib/messages/messages.ts");
 const message_1 = __webpack_require__(/*! ../../messages/message */ "./src/lib/messages/message.ts");
 const newline_1 = __webpack_require__(/*! ../../util/newline */ "./src/lib/util/newline.ts");
-const configureSocket = function (user, store, messageHandler) {
+const configureSocket = function (user, messageHandler) {
     const destroy = (e) => {
         console.log('destroying socket connection with the client', { e });
         user.removeSocket(this);
@@ -43138,7 +43151,7 @@ const configureSocket = function (user, store, messageHandler) {
     this.on('data', (msg) => {
         try {
             console.log("received message", { msg });
-            messageHandler(msg, store, user);
+            messageHandler(msg, user);
         }
         catch (error) {
             console.error("message handle error", { error, msg });
@@ -43185,8 +43198,8 @@ user_1.User.serverUser = user_1.User.createUser("server user", new FakeServerSoc
 class TCPSocketWrapper extends SocketWrapper {
     constructor() {
         super(...arguments);
-        this.configure = (user, store, messageHandler) => {
-            configureSocket.bind(this)(user, store, messageHandler);
+        this.configure = (user, messageHandler) => {
+            configureSocket.bind(this)(user, messageHandler);
         };
         this.write = (msg) => {
             if (this.isJson) {
@@ -43263,7 +43276,7 @@ exports.websocketMessageEventName = "data";
 const renamer = (e) => {
     let renamedEvent = e;
     if (e === "close") {
-        renamedEvent = "dissconnect";
+        renamedEvent = "disconnect";
     }
     return renamedEvent;
 };
@@ -43293,7 +43306,8 @@ class WebSocketWrapper extends SocketWrapper {
             }
         };
         this.getIdentity = () => identityGetter_1.websocketIdentityGetter(this);
-        this.destroy = () => { };
+        this.destroy = () => {
+        };
     }
 }
 exports.WebSocketWrapper = WebSocketWrapper;
@@ -43354,7 +43368,13 @@ class User {
         this.forEachSocket = (cb) => this.sockets.forEach((s) => cb(s));
         this.writeToAllSockets = (m) => this.sockets.forEach(s => s.write(m));
         this.addSocket = (socket) => this.sockets.add(socket);
-        this.removeSocket = (socket) => this.sockets.remove(socket);
+        this.removeSocket = (socket) => {
+            this.sockets.remove(socket);
+            if (Object.keys(this.sockets.store).length === 0) {
+                this.channels.forEach(c => c.removeUser(this));
+                console.log("user leave all channels");
+            }
+        };
         this.addChannel = (channel) => {
             this.channels.add(channel);
             channel.users.add(this);

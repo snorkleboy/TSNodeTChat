@@ -3,36 +3,26 @@ import * as ReactDOM from "react-dom";
 require("./main.css");
 import io from 'socket.io-client';
 import { Socket } from "socket.io";
-import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests, ChannelPostRequest, WebRTCOfferStream, WebRTCAnswerStream, WebRTCIceCandidate } from "../../lib/messages/messages";
+import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests, ChannelPostRequest } from "../../lib/messages/messages";
 import { DestinationTypes } from "../../lib/messages/message";
 import { StreamAwaiter ,StreamChecker} from "../tcpClient/streamAwaiter";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import { newLineArt } from "../../lib/util/newline";
 import {  RTCClientManager} from "./rtcHandler"
 
-
-
-
-
-interface HelloProps { compiler: string; framework: string; }
-const Hello = (props: HelloProps) => (
-    <section>
-        <SocketComponent/>
-    </section>
-)
-console.log({ websocketMessageEventName})
-
 interface VCState {
     localStream: any
     partners: { [k: string]: Partner }
+    vcManager: RTCClientManager
 }
 interface SocketState {
     socket:Socket,
     auth:false,
     channels:Array<string>,
     currentChannel:string,
+    channelsObj: { [k: string]: {name:string,users:Array<string>,}},
+    currentChannelUsers:[],
     userName:string,
-    PC:any,
 }
 interface TypeingState {
     msg:string
@@ -67,12 +57,14 @@ class SocketComponent extends React.Component {
         msg:"",
         msgs:[],
         channels:[],
+        channelsObj: {},
+        currentChannelUsers: [],
         currentChannel:null,
         auth:false,
-        userName: "websocket U " + Date.now()%1000 ,
-        PC:null,
+        userName: "wsU " + Date.now()%1000 ,
+        vcManager:null,
         localStream:null,
-        partners: {}
+        partners: {},
     }
     videoWebCamRefLoc
     streamAwaiter = new StreamAwaiter();
@@ -97,7 +89,7 @@ class SocketComponent extends React.Component {
             this.configureSocket()
                 .then(() => {
                     that.startRTC();
-                    document.title = this.state.userName.split("websocket")[1];
+                    document.title = this.state.userName;
                 })
                 .catch(function (e) {
                     console.log("Something went wrong!", { e });
@@ -145,7 +137,7 @@ class SocketComponent extends React.Component {
                     console.log('json parse error', { msg, error });
                 }
             }
-            // (msg as any).action !== "META" && console.log("recieved", { msg });
+            (msg as any).action !== "META" && console.log("recieved", { msg });
 
             if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
                 this.setState({
@@ -154,17 +146,38 @@ class SocketComponent extends React.Component {
             }
             if (isChannelPostResponse(msg) && (msg as ChannelPostResponse).payload.channelName) {
                 msg = msg as ChannelPostResponse;
+                let {currentChannelUsers, channelsObj} = this.state
                 const channelName = msg.payload.channelName;
                 const userThatJoined = msg.payload.userThatJoined;
                 const displayName = userThatJoined === this.state.userName? "You":userThatJoined;
-                let channels = this.state.channels
-                if (!this.state.channels.some(c=>c===channelName)){
+                let channels = this.state.channels;
+                const userLeftChannel = msg.payload.leftChannel;
+                const channelObj = channelsObj[channelName];
+
+                if (!this.state.channelsObj[channelName]){
                     channels= [...this.state.channels, msg.payload.channelName]
+                } else if (userThatJoined !== this.state.userName){
+                    if (userLeftChannel){
+                        currentChannelUsers = (remove(channelObj.users, userThatJoined) as any)
+                        if (channelObj) {
+                            channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
+                        }
+                    }else{
+                        currentChannelUsers = ([...channelObj.users, userThatJoined] as any)
+                        if (channelObj) {
+                            channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
+                        }
+                    }
+
                 }
+                console.log({ state: this.state, userLeftChannel, userThatJoined, channelObj})
                 this.setState({
-                    msgs: [...this.state.msgs, `${displayName} joined ${msg.payload.channelName}`],
-                    channels
+                    msgs: [...this.state.msgs, `${displayName} ${userLeftChannel?"left":"joined"} ${msg.payload.channelName}`],
+                    channels,
+                    currentChannelUsers,
+                    channelsObj
                 })
+                
 
             }
             this.streamAwaiter.onData(msg);
@@ -191,7 +204,7 @@ class SocketComponent extends React.Component {
     }
     startRTC = () => {
         const that = this;
-        const PC = new RTCClientManager(that.state.userName, ()=>that.state.currentChannel, this.streamAwaiter,this.getVideoStream,
+        const vcManager = new RTCClientManager(that.state.userName, ()=>that.state.currentChannel, this.streamAwaiter,this.getVideoStream,
             (msg, checker) => that.sendToServer(that.state.socket, msg, checker),
             (e,partner) => {
                 console.log("on track callback", { e, partner, partners: this.state.partners});
@@ -209,11 +222,13 @@ class SocketComponent extends React.Component {
                 });
             }
         )
-        that.setState({ PC });
+        that.setState({ vcManager });
     }
     startVideoChat = async ()=>{
         console.log("start video chat");
-        await this.state.PC.start();
+        const partners = remove(this.state.currentChannelUsers, this.state.userName);
+        console.log({ partners,username:this.state.userName});
+        await this.state.vcManager.broadCastOffer(partners);
         document.title = "[P]" + document.title 
         this.startLocalVideo(await this.getVideoStream());
     }
@@ -229,9 +244,19 @@ class SocketComponent extends React.Component {
                         channels
                     </div>
                     <div>
-                        {this.state.channels.map(c => (
-                            <div onClick={() => this.createChannelPostMessage(c)}
-                            >{c}</div>
+                        {Object.entries(this.state.channelsObj).map(([name,c]) => (
+                            <div onClick={() => this.createChannelPostMessage(name)}
+                            >
+                                <label>
+                                    {name}
+                                </label>
+                                <ul>
+                                    {
+                                        c.users.map(u=><li>{u.slice(0,10)}</li>)
+                                    }
+                                </ul>
+                                
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -275,6 +300,8 @@ class SocketComponent extends React.Component {
     ).then(msg => this.setState({
         auth: true,
         channels: msg.payload.channels.map(c => c.name),
+        channelsObj: ((c)=>{const obj = {};c.forEach(c=>obj[c.name]=c);return obj})(msg.payload.channels),
+        currentChannelUsers: msg.payload.channels[0].users,
         currentChannel: msg.payload.channels[0].name
     })).then(() => console.log("login recieved")).catch(e => console.log("didnt recive login in time", { e }))
     createChannelPostMessage = (c) => {
@@ -305,10 +332,13 @@ class SocketComponent extends React.Component {
             }));
     }
 }
-
+const remove = (arr, el) => {
+    const i = arr.indexOf(el);
+    return [...arr.slice(0, i), ...arr.slice(i + 1, arr.length)]
+}
 document.addEventListener("DOMContentLoaded",()=>{
     ReactDOM.render(
-        <Hello compiler="TypeScript" framework="React" />,
+        <SocketComponent/>,
         document.getElementById("root")
     );
 })

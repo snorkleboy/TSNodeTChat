@@ -1,6 +1,7 @@
 import { User } from "../user/user"
 import { IdedEntity, RecordStore } from "../recordStore";
 import { Store } from "../store";
+import { ChannelPostResponse, ChannelPostRequest } from "../../messages/messages";
 let channelId = 0;
 const getNewChannelId = () => channelId++;
 export class Channel implements IdedEntity {
@@ -13,8 +14,14 @@ export class Channel implements IdedEntity {
         user.channels.add(this);
         return user; 
     }
-    removeUser = (user: User)=>this.users.remove(user);
+    removeUser = (user: User)=>{
+        this.users.remove(user);
+        this.users.forEach(u=>u.writeToAllSockets(
+            new ChannelPostResponse(new ChannelPostRequest({channelName:this.name}),user,false,true)
+        ))
+    }
     getUserByName = (name:string):User=>this.users.getBy(u=>u.username === name);
+    getUserList = ():Array<User>=>Object.values(this.users.store)
     static getChannel = (id: number): Channel => Store.getStore().channels.get(id);
     static getChannelByName = (name: string): Channel => Store.getStore().channels.getByName(name);
     static addChannel = (channel): Channel => Store.getStore().channels.add(channel);
