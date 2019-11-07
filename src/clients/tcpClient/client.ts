@@ -1,8 +1,8 @@
-import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest ,HandledResponses} from "../../lib/messages/messages";
+import { UserPostResponse, HandledRequests, UserPostRequest, TextMessagePostRequest, TextMessagePostResponse, ChannelPostResponse, ChannelPostRequest ,HandledResponses, WebRTCAnswerOffer, WebRTCAnswerOfferResponse, WebRTCOfferStreamResponse} from "../../lib/messages/messages";
 import { StreamAwaiter } from "./streamAwaiter";
 import {match,when, def} from "../../lib/util/switchExp"
 import { newLineArt} from "../../lib/util/newline"
-import { DestinationTypes } from "../../lib/messages/message";
+import { DestinationTypes, MessageTypes, ActionTypes } from "../../lib/messages/message";
 var net = require('net');
 const readline = require('readline');
 
@@ -23,6 +23,16 @@ type publicCommand = {
 };
 type PublicCommands = {
     [key: string]: publicCommand
+}
+const clear = ()=>{
+    const lines = process.stdout.getWindowSize()[1];
+    console.log('-------');
+
+    for (var i = 0; i < lines; i++) {
+        console.log('\r\n');
+    }
+    console.log('--------');
+
 }
 const commandsMaker: (c: Client)=>PublicCommands = (ClientContext)=> ({
     "/h": { name: 'help', action: null },//made at construction
@@ -49,7 +59,7 @@ type setIdentity = ({useName:string})=>Promise<{id:number,channels:Array<any>}>
 
 
 class Client{
-    protected streamAwaiter = StreamAwaiter();
+    protected streamAwaiter =new StreamAwaiter();
     private publicCommands: PublicCommands = commandsMaker(this);
     private stdIn = process.openStdin();
     public state: ComponentState  = {
@@ -74,17 +84,22 @@ class Client{
         let json;
         try {
             json = JSON.parse(chunk.toString());
+            this.streamAwaiter.onData(json);
+            clear();
+            // console.log("received", { json });
+            if (json.payload && json.payload.body) {
+                this.state.msgs.push(`from ${json.payload.from.name}:${json.payload.body}`);
+                this.state.msgs.forEach(m => console.log(m));
+            } else if (json.type === MessageTypes.WRTCAV) {
+                if (json.action === ActionTypes.offer) {
+                    this.writeToServer(new WebRTCAnswerOffer((json as WebRTCOfferStreamResponse), { username: this.state.name }, { width: 30, height: 30 }, true))
+                } else if (json.action === ActionTypes.post) {
+                    process.stdout.write(json.payload.video)
+                }
+            }
         } catch (error) {
-            console.error("couldnt parse message",{chunk});
+            console.warn("couldnt parse message");
         }
-
-        console.log("received",{json});
-        this.streamAwaiter.onData(json);
-        if(json.payload && json.payload.body){
-            this.state.msgs.push(`from ${json.payload.from.name}:${json.payload.body}`);
-            this.state.msgs.forEach(m => console.log(m));
-        }
-
     }
     start = async () => {
         while (!this.state.close) {
@@ -136,13 +151,7 @@ class Client{
         channelName:name,
         switchTo
     })
-    makeTextMessage = (msg: string) => new TextMessagePostRequest({
-        body:msg,
-        destination:{
-            type:DestinationTypes.channel,
-            val:this.state.channel.name
-        }
-    })
+    makeTextMessage = (msg: string) => new TextMessagePostRequest(msg,this.state.channel.name)
 }
 
 export const startClient = (port,address)=>{

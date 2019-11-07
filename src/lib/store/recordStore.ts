@@ -11,6 +11,7 @@ export class RecordStore<T extends IdedEntity>{
     public removeById = (id: number) => delete this.store[id]
 
     public get = (id: number) => this.store[id];
+    public getBy = (cb:(item:T)=>Boolean):T=>Object.values(this.store).find(item=>cb(item));
 }
 export class UserStore extends RecordStore<User>{}
 export class ChannelStore extends RecordStore<Channel>{

@@ -19,7 +19,10 @@
     color: rgb(23, 23, 23);
     font-size: 18px;
 }
-
+.videos video{
+    width: 300px;
+    height: 300px;
+}
 .messageBox {
     height: 80vh;
     box-sizing: border-box;

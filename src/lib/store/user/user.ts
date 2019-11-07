@@ -15,7 +15,13 @@ export class User implements IdedEntity {
     forEachSocket = (cb: (s: WrappedSocket)=>void) => this.sockets.forEach((s)=>cb(s));
     writeToAllSockets = (m:MessageLike)=>this.sockets.forEach(s=>s.write(m));
     addSocket = (socket: WrappedSocket)=>this.sockets.add(socket);
-    removeSocket = (socket)=>this.sockets.remove(socket);
+    removeSocket = (socket)=>{
+        this.sockets.remove(socket);
+        if(Object.keys(this.sockets.store).length === 0){
+            this.channels.forEach(c=>c.removeUser(this));
+            console.log("user leave all channels");
+        }
+    }
     addChannel = (channel:Channel)=>{
         this.channels.add(channel);
         channel.users.add(this);
