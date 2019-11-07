@@ -5,9 +5,10 @@ import { User } from "../user/user";
 import { TCPIdentityGetter, websocketIdentityGetter } from "./identityGetter";
 import { Store } from "../store";
 import { MessageHandlerGen } from "../../messages/messageTypeExport";
-import { HandledRequests, TextMessagePostRequest, TextMessagePostResponse } from "../../messages/messages";
+import { HandledRequests, TextMessagePostRequest, TextMessagePostResponse, WebRTCOfferStreamResponse, WebRTCDWSStreamResponse, WebRTCDWSStreamFrame, WebRTCAnswerOffer } from "../../messages/messages";
 import { DestinationTypes, MessageLike, MessageTypes, ActionTypes } from "../../messages/message";
 import { newLineArt } from "../../util/newline";
+import { getNextMessage } from "../../util/getNextMessage";
 
 type ConfigureSocket = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>void;
 const configureSocket: ConfigureSocket = function(user: User, messageHandler: MessageHandlerGen<HandledRequests>) {
@@ -32,6 +33,8 @@ const configureSocket: ConfigureSocket = function(user: User, messageHandler: Me
             console.error("message handle error", { error, msg });
         }
     });
+    this.messageHandler = messageHandler;
+    this.user = user;
     console.log("socket configured", user.username);
 }
 const isTCPSocket = (s: TCPSocket): s is TCPSocket=>!!((s as TCPSocket)._writev && s.cork && s.unref)
@@ -43,6 +46,8 @@ export type WrappedSocket = TCPSocketWrapper | WebSocketWrapper | FakeServerSock
 export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
     constructor(public socket: T,public id:number){};
     public configure: ConfigureSocket = configureSocket.bind(this);
+    protected user:User;
+    protected messageHandler: MessageHandlerGen<HandledRequests>;
     abstract write:(msg:MessageLike)=>void;
     abstract on:(event:string,cb)=>void;
     abstract once:(event:string,cb)=>void;
@@ -74,6 +79,7 @@ User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     isJson:Boolean;
     user: User;
+    videoPartner:any = false;
     configure = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>{
         configureSocket.bind(this)(user, messageHandler);
     }
@@ -98,6 +104,44 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
                         this.socket.emit("close");
                     }
                 })
+            }else if (
+                msg.type === MessageTypes.WRTCAV &&
+                msg.action === ActionTypes.offer &&
+                !this.videoPartner
+            ){
+                const mess = msg as WebRTCOfferStreamResponse
+                this.socket.write(`got video offer from ${mess.payload.from}, "{width},{height}" to accept or anything else to decline:`)
+                this.videoPartner = mess.payload.from;
+                getNextMessage(this.socket,10000)
+                    .then((v)=>{
+                        const m = v.toString();
+                        const [w,h] = m.split("\n")[0].split(",");
+                        console.log("\nHERE\n", { m,w,h })
+                        let areNums;
+                        try{
+                            areNums = parseInt(h) && parseInt(w)
+                        }catch(e){
+
+                        }
+                        if (w !== 'n' && areNums){
+                            this.messageHandler(new WebRTCAnswerOffer(mess,{username:this.user.username},{width:w,height:h},true),this.user);
+                        }else{
+                            this.socket.write(`declined`)
+                            this.videoPartner = null;
+                        }
+                    })
+                    .catch(e=>console.log({e}));
+            }else if(
+                msg.type === MessageTypes.WRTCAV &&
+                msg.action === ActionTypes.post &&
+                msg.payload.video
+            ){
+                this.socket.write(`\n${(msg as WebRTCDWSStreamFrame).payload.video}\n`, e => {
+                    if (e) {
+                        console.log("raw tcp socket write error", { e, msg, sockId: this.id });
+                        this.socket.emit("close");
+                    }
+                })
             }
         }
 
@@ -116,7 +160,6 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
         const str = m.toString();
         const channel = (c => c ? c.name : "all")(this.user.channels.getList[0]);
         const json = new TextMessagePostRequest(str,channel)
-        console.log(this.user.channels.getList[0]);
         next(json);
     }
     on = (e,cb)=>{
@@ -137,6 +180,14 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     getIdentity = () => {
         const prom =  TCPIdentityGetter(this)   
         .then(ret=>{
+            if(!ret.err){
+                this.socket.write(`\n you are now in channel 'all':\n`, e => {
+                    if (e) {
+                        console.log("raw tcp socket write error", { e, msg:"welcome message", sockId: this.id });
+                        this.socket.emit("close");
+                    }
+                })
+            }
             this.isJson = ret.isJson;
             this.user = ret.user;
             return ret;

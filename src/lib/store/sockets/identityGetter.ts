@@ -39,7 +39,7 @@ export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper)
     const errorCB = err => console.log(`Error before identity: ${err}`)
     socket.socket.on('end', endCB);
     socket.socket.on('error', errorCB);
-
+    socket.socket.write("please enter name:");
     let err;
     let user;
     let isJson;
@@ -85,7 +85,6 @@ const handleIdentityChunk = (chunk, socket): identityReturn => {
     let user;
     let isJson;
     let err;
-    console.log("handle chunk", { chunk, user, isJson })
 
     try {
         parsed = JSON.parse(chunk);
@@ -100,7 +99,7 @@ const handleIdentityChunk = (chunk, socket): identityReturn => {
         }else{
             err = true;
         }
-        console.log("handle chunk not json", { err, chunk, userInfo });
+        console.log("handle identity chunk not json", { err, chunk, userInfo });
 
     }
     return {

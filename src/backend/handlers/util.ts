@@ -20,12 +20,17 @@ export const simpleSendHandler = <Req extends HandledRequests, Res extends Respo
     message: Req,
     user: User,
     responseMessage:()=> Res,
-    { allowSingleUserDestination= true, allowChannelDestination= true }={}
+    { allowSingleUserDestination= true, allowChannelDestination= true,echo = true }={}
 ) => destinationTypeHandler(message,
     () => {
         if (allowSingleUserDestination) {
             const otherUser = User.getUserByName((message.destination as SingleUserDestination).val.user);
-            [otherUser, user].forEach(u => u.writeToAllSockets(responseMessage()))
+            (
+                echo?
+                    [otherUser, user]
+                :
+                    [user]
+            ).forEach(u => u.writeToAllSockets(responseMessage()))
         } else {
             console.error("single user message not implimented", { message, user });
         }

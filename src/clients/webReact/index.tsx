@@ -38,12 +38,15 @@ type sendToServer = {
     <Req extends HandledRequests | UserPostRequest, Res extends HandledResponses | UserPostResponse>(
         socket: Socket,
         msg: Req,
-        checker?: StreamChecker<Res>
+        checker?: StreamChecker<Res>,
+        timeout?:number
     ): Promise<Res>;
     <Req extends HandledRequests | UserPostRequest, Res extends HandledResponses | UserPostResponse>(
         socket: Socket,
         msg: Req,
-        checker?:null|undefined
+        checker?:null|undefined,
+                timeout?:number
+
     ): void
 }
 const isChannelPostResponse = (msg:HandledResponses|UserPostResponse)=>!!(msg as ChannelPostResponse).payload.userThatJoined
@@ -73,12 +76,12 @@ class SocketComponent extends React.Component {
         this.videoWebCamRefLoc = React.createRef();
 
     }
-    sendToServer: sendToServer = (socket, msg, checker = null) => {
+    sendToServer: sendToServer = (socket, msg, checker = null,timeout=null) => {
         // console.log("sending to server", { msg });
         const str = JSON.stringify(msg);
         socket.emit(websocketMessageEventName, str);
         if (checker) {
-            return this.streamAwaiter.waitFor(checker);
+            return this.streamAwaiter.waitFor(checker,timeout);
         } else {
             return null
         }
@@ -110,8 +113,10 @@ class SocketComponent extends React.Component {
         }
     }
     configureSocket = ()=>new Promise((r)=>{
-
-        const socket = io("localhost:3005", {
+        let addr = "localhost";
+        addr = "localhost"
+        addr = addr + ":3005";
+        const socket = io(addr, {
             transports: ['websocket']
         })
         this.setState({ socket });
@@ -125,9 +130,10 @@ class SocketComponent extends React.Component {
         socket.on("reconnect_failed", (e) => { console.log("reconnect_failed", new Date().getMinutes(), { e }) });
         socket.on("dissconnect", (e) => { console.log("dissconnect", { e }) });
         socket.on("connect", (e) => {
+            console.log("socket connect");
             this.login(this.state.socket)
             .then(()=>r());
-            console.log("connect", new Date().getMinutes(), { e }) 
+            console.log("connect", { e }) 
         });
         socket.on(websocketMessageEventName, (msg: HandledResponses | UserPostResponse) => {
             if (typeof msg === 'string') {
@@ -138,7 +144,6 @@ class SocketComponent extends React.Component {
                 }
             }
             (msg as any).action !== "META" && console.log("recieved", { msg });
-
             if (isTextResponse(msg) && msg.payload.from.name !== this.state.userName) {
                 this.setState({
                     msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
@@ -191,14 +196,19 @@ class SocketComponent extends React.Component {
         }
     }
     getVideoStream = () => {
+        console.log("gvs",{state:this.state});
         if(this.state.localStream){
-            return Promise.resolve(this.state.localStream);
+            console.log("here get stream from state");
+            return Promise.resolve({ stream: this.state.localStream, ref: this.videoWebCamRefLoc});
         }else{
+            console.log("here get stream into state");
              return navigator.mediaDevices.getUserMedia({ video: true })
              .then(s=>{
-                 console.log({s})
-                 this.setState({localStream:s});
-                 return s;
+                console.log("got stream:",{s})
+                this.setState({localStream:s});
+                return {
+                    stream: s, ref: this.videoWebCamRefLoc
+                };
              });
         }
     }
@@ -209,7 +219,7 @@ class SocketComponent extends React.Component {
             (e,partner) => {
                 console.log("on track callback", { e, partner, partners: this.state.partners});
                 this.getVideoStream()
-                    .then(s => this.startLocalVideo(s))
+                    .then(s => this.startLocalVideo(s.stream))
                 
                 this.setState({
                     partners:{
@@ -230,7 +240,7 @@ class SocketComponent extends React.Component {
         console.log({ partners,username:this.state.userName});
         await this.state.vcManager.broadCastOffer(partners);
         document.title = "[P]" + document.title 
-        this.startLocalVideo(await this.getVideoStream());
+        this.startLocalVideo((await this.getVideoStream()).stream);
     }
     render = ()=>(
         <section className="top" >
@@ -298,6 +308,7 @@ class SocketComponent extends React.Component {
         new UserPostRequest({ userName: this.state.userName }),
         m => isLoginResponse(m)
     ).then(msg => this.setState({
+        debug:console.log("SET LOGGED IN STATE"),
         auth: true,
         channels: msg.payload.channels.map(c => c.name),
         channelsObj: ((c)=>{const obj = {};c.forEach(c=>obj[c.name]=c);return obj})(msg.payload.channels),

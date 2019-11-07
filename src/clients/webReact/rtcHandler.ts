@@ -1,18 +1,54 @@
 import { PureComponent } from "react";
-import { WebRTCOfferStream, WebRTCAnswerOffer, WebRTCIceCandidate, WebRTCAnswerOfferResponse, WebRTCOfferStreamResponse } from "../../lib/messages/messages";
+import { WebRTCOfferStream, WebRTCAnswerOffer, WebRTCIceCandidate, WebRTCAnswerOfferResponse, WebRTCOfferStreamResponse, WebRTCDWSStreamFrame } from "../../lib/messages/messages";
 import {StreamAwaiter} from "../tcpClient/streamAwaiter"
 import { DestinationTypes, ActionTypes, MessageLike, Response, SingleUserDestination } from "../../lib/messages/message";
+import CanvasASCII from "jw-canvas-ascii";
+var asciiPixels = require('ascii-pixels')
+
 const configuration = {
     iceServers: [{
         urls: 'stun:stun.l.google.com:19302' // Google's public STUN server
     }]
 };
+class DWSPartner{
+    fps:number = null;
+    intervalRef = null;
 
+    constructor(
+        public downGradeMessage:WebRTCAnswerOfferResponse,
+        public getData,
+        partnerConnection: PartnerConnection,
+        public send=partnerConnection.sendMessageToTargetClient,
+        public partner = partnerConnection.partner,
+        public channel = partnerConnection.channel,
+        public username = partnerConnection.username,
+    )
+    {
+        this.fps = downGradeMessage.payload.description.fps||15;
+        this.startSending();
+    }
+    startSending = ()=>{
+        const w = this.downGradeMessage.payload.description.width;
+        const h = this.downGradeMessage.payload.description.height;
+        this.intervalRef = setInterval(
+            async ()=>this.send(
+                new WebRTCDWSStreamFrame(this.downGradeMessage,{
+                    from: this.username,
+                    video: (await this.getData(w,h)).video
+                })
+            )
+            ,
+            1000/this.fps
+        )
+    }
+    onOffer=()=>{console.error("not implimented")}
+}
 class PartnerConnection{
     localDescription
     foreignDescription
     PC
-
+    offering=false;
+    recieving=false;
     partnerIceCandidates=[]
     constructor(
         public username: string,
@@ -22,6 +58,7 @@ class PartnerConnection{
         public getVideoStream,
         public sendMessageToTargetClient,
         public onTrackReceived,
+        public onDownGradeToDWS
     ){
         this.PC = new RTCPeerConnection(configuration);
         this.PC.onicecandidate = this.sendIceCandidate;
@@ -30,10 +67,13 @@ class PartnerConnection{
         this.waitForIce();
     }
     startOffering = async () => {
-        console.log("start offering", this)
-        const stream = await this.getVideoStream();
-        stream.getTracks().forEach((track) => this.PC.addTrack(track, stream));
-        return stream;
+        if(!this.offering){
+            console.log("start offering", this)
+            this.offering = true;
+            const stream = await this.getVideoStream();
+            stream.getTracks().forEach((track) => this.PC.addTrack(track, stream));
+            return stream;
+        }
     }
     onOffer = async (msg: WebRTCOfferStreamResponse) => {
         const PC = this.PC;
@@ -52,6 +92,7 @@ class PartnerConnection{
     }
     protected onTrack = (e) => {
         console.log("PC.ontrack", { this: this, cs: this.PC.iceGatheringState, e })
+        this.recieving = true;
         this.addCandidatesToPC();
         this.onTrackReceived(e, this.partner);
     }
@@ -82,8 +123,12 @@ class PartnerConnection{
         .then((answer: WebRTCAnswerOfferResponse) => {
             console.log("onnegotiationneeded received answer", { answer, cs: this.PC.signalingState });
             this.foreignDescription = answer.payload.description;
-            return this.PC.setRemoteDescription(this.foreignDescription)
-                .catch(e => console.error("ON ASWERtry set remote desc failed", { answer, e, this: this }))
+            if(answer.payload.directWS){
+                this.onDownGradeToDWS(answer)
+            }else{
+                return this.PC.setRemoteDescription(this.foreignDescription)
+                    .catch(e => console.error("ON ASWERtry set remote desc failed", { answer, e, this: this }))
+            }
         });
 
     
@@ -124,13 +169,39 @@ class PartnerConnection{
         .catch(e => console.log("receive ice error", { e }))
         .then(() => this.waitForIce())
 }
+class LocalVideoCanvasCache{
+    canvas = document.createElement('canvas');
+    latestFrame:string = null;
+    // latestAccess:number = null;
+    constructor(public video){
+        document.body.appendChild(this.canvas);
+    }
+    getFrame = (w,h)=>{
+        const d = Date.now();
+        // if(this.latestFrame && d-this.latestAccess> (1000/30)){
+            // return this.latestFrame;
+        // }else{
+            this._getFrame(w,h);
+            return this.latestFrame
+        // }
+    }
+    _getFrame = (w,h)=>{
+        const canvas = this.canvas;
+        canvas.width = w||100;
+        canvas.height = h||100;
 
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(this.video, 0, 0, canvas.width, canvas.height );
+        this.latestFrame = asciiPixels(ctx.getImageData(0, 0, canvas.width, canvas.height )) ;
+        // this.latestAccess = Date.now();
+    }
+}
 
 export class RTCClientManager  {
-    connections: { [k: string]: PartnerConnection} = {
+    connections: { [k: string]: PartnerConnection|DWSPartner} = {
 
     };
-
+    localVideoDWSCache: LocalVideoCanvasCache = null;
     constructor(
         public username: string,
         public getChannel,
@@ -140,7 +211,6 @@ export class RTCClientManager  {
         public onTrackReceived,
     ){
         this.waitForRTCOffer();
-
     }
     private waitForRTCOffer = () => {
         const that = this;
@@ -158,13 +228,21 @@ export class RTCClientManager  {
     }
     private onOffer = (potentialPartner,msg)=>{
         if (!this.connections[potentialPartner]) {
-            console.error("manager got new offer from unknown parnter", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
+            console.log("manager got new offer from unknown parnter", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
             this.connections[potentialPartner] = this.newConnection(potentialPartner);
         }else{
-            console.error("manager got offer for existing conection", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
+            console.log("manager got offer for existing conection", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })
         }
         this.connections[potentialPartner].onOffer(msg);
 
+    }
+    private getVideoData = async (w,h)=>{
+        if (!this.localVideoDWSCache){
+            const s = await (this.getVideoStream());
+            console.log({ref:s});
+            this.localVideoDWSCache = new LocalVideoCanvasCache(s.ref.current)
+        }
+        return {video:this.localVideoDWSCache.getFrame(w,h)};
     }
     private newConnection = (partner:string)=>{
         const conn = new PartnerConnection(
@@ -172,15 +250,23 @@ export class RTCClientManager  {
             this.getChannel(),
             partner,
             this.streamAwaiter,
-            this.getVideoStream, 
+            async ()=>{
+                const str = (await this.getVideoStream()).stream;
+                console.log("get videostream (rtcmanager)",{str});
+                return str;
+            }, 
             this.sendMessageToTargetClient,
-            this.onTrackReceived
+            this.onTrackReceived,
+            (msg)=>{
+                console.log("downgrade",{msg});
+                this.connections[partner] = new DWSPartner(msg, this.getVideoData,conn)
+            }
         );
         return conn;
     }
     broadCastOffer = (partnerNames:Array<string>)=>{
         console.log("broadcast", { partnerNames});
-        partnerNames.forEach(p => (this.connections[p] = this.newConnection(p)) && this.connections[p].startOffering());
+        partnerNames.forEach(p => (this.connections[p] = this.newConnection(p)) && (this.connections[p] as PartnerConnection).startOffering());
     }
 }
 

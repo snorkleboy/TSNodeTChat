@@ -18,14 +18,16 @@ export const socketHandler = async (
         console.log(Object.entries(Store.getStore().users.store).map(([k, u]) => ({ name: u.username, sockets:Object.values(u.sockets.store)})))
 
         socketWrapper.configure(user, messageHandler);
-        socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
-        const joinChannelMessage = new ChannelPostResponse(
-            new ChannelPostRequest({
-                channelName: Store.defaultChannel.name,
-                switchTo: true
-            }), user
-        );
-        Store.defaultChannel.forEachUser(u => u.writeToAllSockets(joinChannelMessage))
+        setTimeout(()=>{
+            socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
+            const joinChannelMessage = new ChannelPostResponse(
+                new ChannelPostRequest({
+                    channelName: Store.defaultChannel.name,
+                    switchTo: true
+                }), user
+            );
+            Store.defaultChannel.forEachUser(u => u.writeToAllSockets(joinChannelMessage))
+        },100)
 
     }else{
         console.error("bailed out of identity getter");

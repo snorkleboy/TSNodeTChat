@@ -9,13 +9,14 @@ export type HandledRequests =
     | WebRTCIceCandidate
     | WebRTCOfferStream
     | WebRTCAnswerOffer
-    | WebRTCRenegotiateStream
+    | WebRTCDWSStreamFrame
+    // | WebRTCRenegotiateStream
 
 export type HandledResponses = TextMessagePostResponse 
     | ChannelPostResponse 
     | ChannelGetResponse
     | WebRTCOfferStreamResponse
-    | WebRTCRenegotiateResponse
+    // | WebRTCRenegotiateResponse
     | WebRTCAnswerOfferResponse
 ;
 export class TextMessagePostRequest implements Request {
@@ -49,7 +50,7 @@ export class ChannelPostRequest implements Request {
             channelName: string,
             switchTo?: boolean,
         }, 
-        public destination: Destination = ServerDestination
+        public destination: Destination = {type:DestinationTypes.channel,val:{channel:payload.channelName}}
     ) { }
 }
 export class ChannelPostResponse extends Response<ChannelPostRequest> {
@@ -92,45 +93,65 @@ export class WebRTCIceCandidate implements Request {
         }
     }) { }
 }
-export class WebRTCOfferStream implements Request{
+
+// export class WebRTCRenegotiateStream implements Request {
+//     type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
+//     action: ActionTypes.patch = ActionTypes.patch
+//     constructor(
+//         public payload: {
+//             description: any,
+//             from: string
+//         },
+//         channel,
+//         otherUser:string,
+//             public destination: Destination = {
+//                 type:DestinationTypes.singleUser,
+//                 val: { user: otherUser, channel}
+//             }
+//     ){}
+// }
+// export class WebRTCRenegotiateResponse extends EchoResponse<WebRTCRenegotiateStream>{ }
+enum StreamTransportTypes {
+    rtc,
+    ws
+}
+export class WebRTCDWSStreamFrame implements Request{
+    type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
+    action: ActionTypes.post = ActionTypes.post
+    constructor(msg:WebRTCAnswerOfferResponse,public payload: {
+        video: any,
+        from: string,
+    },
+    public destination: SingleUserDestination={
+        type:DestinationTypes.singleUser,
+        val: { channel: msg.destination.val.channel,user:msg.payload.answerFrom}
+    }) { }
+}
+export class WebRTCDWSStreamResponse extends EchoResponse<WebRTCDWSStreamFrame>{ }
+
+export class WebRTCOfferStream implements Request {
     type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
     action: ActionTypes.offer = ActionTypes.offer
-    constructor(public payload : {
-        description:any,
-        from:string,
+    constructor(public payload: {
+        description: any,
+        directWS?: boolean,
+        from: string,
         // renegotation?:{
         //     to:string,
         // }
     },
-    public destination: SingleUserDestination|ChannelDestination) { }
+        public destination: SingleUserDestination | ChannelDestination) { }
 }
-export class WebRTCOfferStreamResponse extends EchoResponse<WebRTCOfferStream>{}
-export class WebRTCRenegotiateStream implements Request {
-    type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
-    action: ActionTypes.patch = ActionTypes.patch
-    constructor(
-        public payload: {
-            description: any,
-            from: string
-        },
-        channel,
-        otherUser:string,
-            public destination: Destination = {
-                type:DestinationTypes.singleUser,
-                val: { user: otherUser, channel}
-            }
-    ){}
-}
-export class WebRTCRenegotiateResponse extends EchoResponse<WebRTCRenegotiateStream>{ }
-
+export class WebRTCOfferStreamResponse extends EchoResponse<WebRTCOfferStream>{ }
 export class WebRTCAnswerOffer implements Request {
     type: MessageTypes.WRTCAV = MessageTypes.WRTCAV
     action: ActionTypes.offer = ActionTypes.offer
-    constructor(msg: WebRTCOfferStreamResponse, user:{username:string},desc: any, 
+    constructor(msg: WebRTCOfferStreamResponse, user:{username:string},desc: any,directWS:Boolean=false, 
         public payload = {
             description: desc,
             originalOfferFrom:msg.payload.from,
-            answerFrom:user.username
+            answerFrom:user.username,
+            directWS,
         },
         public destination = {
             type:DestinationTypes.singleUser,
