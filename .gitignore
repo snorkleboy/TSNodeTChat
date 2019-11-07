@@ -1,4 +1,4 @@
 node_modules/
 build/
 public/js
-logs/
+logs/server.log
