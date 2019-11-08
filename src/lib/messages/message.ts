@@ -54,8 +54,8 @@ export interface ChannelDestination extends Destination {
 }
 export abstract class Response<Req extends Request> implements MessageLike{
     constructor(req:Req, 
-        public type = req.type,
-        public action = req.action,
+        public type:Req['type'] = req.type,
+        public action:Req['action'] = req.action,
         public destination = req.destination
     ){}
     isResponse:boolean = true;

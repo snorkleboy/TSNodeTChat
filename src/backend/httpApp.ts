@@ -19,9 +19,11 @@ function httpApp(req, res) {
     // by limiting the path to current directory only
     const sanitizePath = path.normalize(parsedUrl.pathname).replace(/^(\.\.[\/\\])+/, '');
     let pathname = path.join(process.cwd()+"/public", sanitizePath);
-
     fs.exists(pathname, function (exist) {
+        // console.log({ exist,pathname });
+
         if (!exist) {
+
             // if the file is not found, return 404
             res.statusCode = 404;
             res.end(`File ${pathname} not found!`);
@@ -37,6 +39,7 @@ function httpApp(req, res) {
         fs.readFile(pathname, function (err, data) {
             if (err) {
                 res.statusCode = 500;
+                console.error(`Error getting the file: ${ err }.`)
                 res.end(`Error getting the file: ${err}.`);
             } else {
                 // based on the URL path, extract the file extention. e.g. .js, .doc, ...

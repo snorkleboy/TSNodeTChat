@@ -3,17 +3,16 @@ import * as ReactDOM from "react-dom";
 require("./main.css");
 import io from 'socket.io-client';
 import { Socket } from "socket.io";
-import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests, ChannelPostRequest } from "../../lib/messages/messages";
-import { DestinationTypes } from "../../lib/messages/message";
+import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests, ChannelPostRequest, ChannelLeaveResponse } from "../../lib/messages/messages";
 import { StreamAwaiter ,StreamChecker} from "../tcpClient/streamAwaiter";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import { newLineArt } from "../../lib/util/newline";
-import {  RTCClientManager} from "./rtcHandler"
+import { MessageTypes, ActionTypes, MessageLike } from "../../lib/messages/message";
 
 interface VCState {
     localStream: any
     partners: { [k: string]: Partner }
-    vcManager: RTCClientManager
+    vcManager
 }
 interface SocketState {
     socket:Socket,
@@ -50,6 +49,7 @@ type sendToServer = {
     ): void
 }
 const isChannelPostResponse = (msg:HandledResponses|UserPostResponse)=>!!(msg as ChannelPostResponse).payload.userThatJoined
+const isChannelLeaveResponse = (msg: HandledResponses | UserPostResponse): msg is ChannelLeaveResponse =>msg.type === MessageTypes.channelCommand && msg.action === ActionTypes.patch && !!msg.payload.channelLeft
 const isLoginResponse = (msg:HandledResponses|UserPostResponse):msg is UserPostResponse=>!!((msg as UserPostResponse).payload.userName);
 
 const isResponseTo = (req: HandledRequests | UserPostRequest, res: HandledResponses | UserPostResponse, otherCheck: (r: HandledResponses | UserPostResponse)=>boolean) => !!(otherCheck(res) && res.type === req.type && res.action === req.action);
@@ -70,7 +70,7 @@ class SocketComponent extends React.Component {
         partners: {},
     }
     videoWebCamRefLoc
-    streamAwaiter = new StreamAwaiter();
+    streamAwaiter: StreamAwaiter<MessageLike> = new StreamAwaiter();
     constructor(props){
         super(props);
         this.videoWebCamRefLoc = React.createRef();
@@ -148,42 +148,46 @@ class SocketComponent extends React.Component {
                 this.setState({
                     msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
                 })
-            }
-            if (isChannelPostResponse(msg) && (msg as ChannelPostResponse).payload.channelName) {
+            }else if (isChannelPostResponse(msg) && (msg as ChannelPostResponse).payload.channelName) {
                 msg = msg as ChannelPostResponse;
-                let {currentChannelUsers, channelsObj} = this.state
+                let { currentChannelUsers, channelsObj, channels} = this.state
                 const channelName = msg.payload.channelName;
                 const userThatJoined = msg.payload.userThatJoined;
                 const displayName = userThatJoined === this.state.userName? "You":userThatJoined;
-                let channels = this.state.channels;
-                const userLeftChannel = msg.payload.leftChannel;
                 const channelObj = channelsObj[channelName];
-
                 if (!this.state.channelsObj[channelName]){
                     channels= [...this.state.channels, msg.payload.channelName]
                 } else if (userThatJoined !== this.state.userName){
-                    if (userLeftChannel){
-                        currentChannelUsers = (remove(channelObj.users, userThatJoined) as any)
-                        if (channelObj) {
-                            channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
-                        }
-                    }else{
-                        currentChannelUsers = ([...channelObj.users, userThatJoined] as any)
-                        if (channelObj) {
-                            channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
-                        }
+                    currentChannelUsers = ([...channelObj.users, userThatJoined] as any)
+                    if (channelObj) {
+                        channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
                     }
 
                 }
-                console.log({ state: this.state, userLeftChannel, userThatJoined, channelObj})
+                // console.log({ state: this.state, userLeftChannel, userThatJoined, channelObj})
                 this.setState({
-                    msgs: [...this.state.msgs, `${displayName} ${userLeftChannel?"left":"joined"} ${msg.payload.channelName}`],
+                    msgs: [...this.state.msgs, `${displayName} joined ${channelName}`],
                     channels,
                     currentChannelUsers,
                     channelsObj
                 })
                 
 
+            } else if (isChannelLeaveResponse(msg)){
+                const channelName = msg.payload.channelLeft;
+                const username = msg.payload.user.username;
+                let { currentChannelUsers, channelsObj } = this.state
+                const channelObj = channelsObj[channelName];
+                currentChannelUsers = (remove(channelObj.users, username) as any)
+                const displayName = username === this.state.userName ? "You" : username;
+                if (channelObj) {
+                    channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
+                }
+                this.setState({
+                    msgs: [...this.state.msgs, `${displayName} "left" ${channelName}`],
+                    currentChannelUsers,
+                    channelsObj
+                })
             }
             this.streamAwaiter.onData(msg);
         })
@@ -214,25 +218,32 @@ class SocketComponent extends React.Component {
     }
     startRTC = () => {
         const that = this;
-        const vcManager = new RTCClientManager(that.state.userName, ()=>that.state.currentChannel, this.streamAwaiter,this.getVideoStream,
-            (msg, checker) => that.sendToServer(that.state.socket, msg, checker),
-            (e,partner) => {
-                console.log("on track callback", { e, partner, partners: this.state.partners});
-                this.getVideoStream()
-                    .then(s => this.startLocalVideo(s.stream))
-                
-                this.setState({
-                    partners:{
-                        ...this.state.partners,
-                        [partner]:{
-                            videoWebCamRef:React.createRef(),
-                            stream: e.streams[0]
+        import("./rtcHandler")
+        .then(m=>{
+            console.log({m});
+            const { RTCClientManager } = m; 
+            const vcManager = new RTCClientManager(that.state.userName, () => that.state.currentChannel, this.streamAwaiter, this.getVideoStream,
+                (msg, checker) => that.sendToServer(that.state.socket, msg, checker),
+                (e, partner) => {
+                    console.log("on track callback", { e, partner, partners: this.state.partners });
+                    this.getVideoStream()
+                        .then(s => this.startLocalVideo(s.stream))
+
+                    this.setState({
+                        partners: {
+                            ...this.state.partners,
+                            [partner]: {
+                                videoWebCamRef: React.createRef(),
+                                stream: e.streams[0]
+                            }
                         }
-                    }
-                });
-            }
-        )
-        that.setState({ vcManager });
+                    });
+                }
+            )
+            that.setState({ vcManager });
+        })
+
+        
     }
     startVideoChat = async ()=>{
         console.log("start video chat");

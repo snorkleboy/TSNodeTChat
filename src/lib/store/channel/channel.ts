@@ -1,7 +1,7 @@
 import { User } from "../user/user"
 import { IdedEntity, RecordStore } from "../recordStore";
 import { Store } from "../store";
-import { ChannelPostResponse, ChannelPostRequest } from "../../messages/messages";
+import { ChannelPostResponse, ChannelPostRequest, ChannelLeaveRequest, ChannelLeaveResponse } from "../../messages/messages";
 let channelId = 0;
 const getNewChannelId = () => channelId++;
 export class Channel implements IdedEntity {
@@ -14,10 +14,13 @@ export class Channel implements IdedEntity {
         user.channels.add(this);
         return user; 
     }
-    removeUser = (user: User)=>{
+    removeUser = (user: User,leaveMessage:ChannelLeaveRequest = null)=>{
         this.users.remove(user);
+        if (!leaveMessage) {
+            leaveMessage = new ChannelLeaveRequest({channelToLeave: this.name})
+        }
         this.users.forEach(u=>u.writeToAllSockets(
-            new ChannelPostResponse(new ChannelPostRequest({channelName:this.name}),user,false,true)
+            new ChannelLeaveResponse(leaveMessage,user)
         ))
     }
     getUserByName = (name:string):User=>this.users.getBy(u=>u.username === name);
@@ -25,7 +28,6 @@ export class Channel implements IdedEntity {
     static getChannel = (id: number): Channel => Store.getStore().channels.get(id);
     static getChannelByName = (name: string): Channel => Store.getStore().channels.getByName(name);
     static addChannel = (channel): Channel => Store.getStore().channels.add(channel);
-
     static createChannel = (name): Channel => new Channel(getNewChannelId(), name);
     static getOrCreateChannel = (name:string)=>{
         let isNew = false;

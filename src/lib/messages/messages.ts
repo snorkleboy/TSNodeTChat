@@ -18,6 +18,7 @@ export type HandledResponses = TextMessagePostResponse
     | WebRTCOfferStreamResponse
     // | WebRTCRenegotiateResponse
     | WebRTCAnswerOfferResponse
+    | ChannelLeaveResponse
 ;
 export class TextMessagePostRequest implements Request {
     type: MessageTypes.textMessage = MessageTypes.textMessage
@@ -53,13 +54,31 @@ export class ChannelPostRequest implements Request {
         public destination: Destination = {type:DestinationTypes.channel,val:{channel:payload.channelName}}
     ) { }
 }
+
 export class ChannelPostResponse extends Response<ChannelPostRequest> {
-    constructor(msg: ChannelPostRequest, user: User,isNew=false,leftChannel=false, public payload = {
+    constructor(msg: ChannelPostRequest, user: User,isNew=false, public payload = {
         channelName: msg.payload.channelName,
         userThatJoined: user.username,
         isNew,
-        leftChannel
     }) { super(msg) }
+}
+export class ChannelLeaveRequest implements Request {
+    type: MessageTypes.channelCommand = MessageTypes.channelCommand
+    action: ActionTypes.patch = ActionTypes.patch
+    constructor(
+        public payload: {
+            channelToLeave:string
+        },
+        public destination: Destination = ServerDestination,
+    ) { }
+};
+export class ChannelLeaveResponse extends Response<ChannelLeaveRequest> {
+    constructor(msg: ChannelLeaveRequest, user: User,
+        public payload = {
+            user: { username: user.username},
+            channelLeft: msg.payload.channelToLeave
+        }
+    ) { super(msg) }
 }
 export class ChannelGetRequest implements Request {
     type: MessageTypes.channelCommand = MessageTypes.channelCommand

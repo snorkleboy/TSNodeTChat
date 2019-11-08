@@ -1,16 +1,19 @@
 const path = require('path');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
-module.exports = {
-    mode: "development",
+module.exports = (e, config) => ({
+    mode: config.mode || "development",
     entry: path.join(__dirname, "./src/clients/webReact/index.tsx"),
     // Enable sourcemaps for debugging webpack's output.
-    devtool: "source-map",
+    devtool: config.mode === "development" ? "source-map" : "cheap-module-source-map",
 
     resolve: {
         // Add '.ts' and '.tsx' as resolvable extensions.
         extensions: ['.ts', '.tsx', '.js']
     },
-
+    plugins:[
+        // new BundleAnalyzerPlugin()
+    ],
     module: {
         rules: [{
                 test: /\.ts(x?)$/,
@@ -36,7 +39,8 @@ module.exports = {
     },
     output: {
         path: path.join(__dirname, '/public/js/'),
-        filename: 'main.js'
+        filename: 'main.js',
+        publicPath:"/js/"
     }
     // // When importing a module whose path matches one of the following, just
     // // assume a corresponding global variable exists and use that instead.
@@ -46,4 +50,4 @@ module.exports = {
     //     "react": "React",
     //     "react-dom": "ReactDOM"
     // }
-};
+});

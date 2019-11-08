@@ -24,13 +24,21 @@ export const simpleSendHandler = <Req extends HandledRequests, Res extends Respo
 ) => destinationTypeHandler(message,
     () => {
         if (allowSingleUserDestination) {
-            const otherUser = User.getUserByName((message.destination as SingleUserDestination).val.user);
-            (
-                echo?
-                    [otherUser, user]
-                :
-                    [user]
-            ).forEach(u => u.writeToAllSockets(responseMessage()))
+            
+            const channel = user.channels.getByName((message.destination as SingleUserDestination).val.channel);
+            const otherUserName = (message.destination as SingleUserDestination).val.user;
+            const otherUser = channel.users.getBy(u => u.username === otherUserName);
+            if(otherUser && channel){
+                (
+                    echo ?
+                        [otherUser, user]
+                        :
+                        [user]
+                ).forEach(u => u.writeToAllSockets(responseMessage()))
+            }else{
+                console.error("attempted to send message to invalid channel/user combo",{message,user,otherUser,channel,otherUserName})
+            }
+
         } else {
             console.error("single user message not implimented", { message, user });
         }
@@ -38,7 +46,6 @@ export const simpleSendHandler = <Req extends HandledRequests, Res extends Respo
     () => {
         if (allowChannelDestination) {
             const channel = user.channels.getByName(message.destination.val.channel);
-            console.log({reqCh: message.destination.val.channel,channel,channels:user.channels.getList()})
             if (channel) {
                 channel.forEachUser(u => u.writeToAllSockets(responseMessage()))
             }else{

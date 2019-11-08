@@ -1,10 +1,11 @@
 {
     "compilerOptions": {
-        "module": "commonjs",   
+        "module": "esnext",
         "esModuleInterop": true,
         "outDir": "./public/js/",
         "sourceMap": true,
         "target": "es6",
+        "moduleResolution": "node",
         "jsx": "react",
         "allowJs": true
 

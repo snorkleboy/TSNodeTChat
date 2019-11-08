@@ -27,7 +27,7 @@ const configureSocket: ConfigureSocket = function(user: User, messageHandler: Me
     })
     this.on('data', (msg) => {
         try {
-            console.log("received message",{msg});
+            console.log("received message",{msg:JSON.stringify(msg)});
             messageHandler(msg, user);
         } catch (error) {
             console.error("message handle error", { error, msg });

@@ -20,22 +20,25 @@ export const TCPHTTPSwitchServer = (
     });
     WebsocketServer.on("connection", socketHandler);
 
-    tcpServer.on('connection', (socket: Socket & { ['_handle']: any}) => peekIsHttp(socket)
-        .then(({httpBool,msg})=>{
-            console.log("TCP connection", { fd: socket &&  socket._handle && socket._handle.fd, httpBool });
-            try {
-                if (httpBool) {
-                    httpServer.emit("connection", socket);
-                    socket.emit("data", msg);
-                } else {
-                    socketHandler(socket);
-                    socket.emit("data", msg);
+    tcpServer.on('connection', (socket: Socket & { ['_handle']: any}) => {
+        console.log("new TCP connection", { fd: socket && socket._handle && socket._handle.fd,});
+        return peekIsHttp(socket)
+            .then(({ httpBool, msg }) => {
+                console.log("TCP peaked for http", { httpBool, fd: socket && socket._handle && socket._handle.fd, });
+                try {
+                    if (httpBool) {
+                        httpServer.emit("connection", socket);
+                        socket.emit("data", msg);
+                    } else {
+                        socketHandler(socket);
+                        socket.emit("data", msg);
+                    }
+                } catch (error) {
+                    console.error("socket to server level error", { error, socket });
                 }
-            } catch (error) {
-                console.error("socket to server level error",{error,socket});
-            }
 
-        })
+            })
+    }
     );
     tcpServer.on("error", (e) => console.error("tcp server", { e }));
     return { tcpServer, httpServer, WebsocketServer, listen: (listenOptions, cb) => tcpServer.listen(listenOptions, cb)};

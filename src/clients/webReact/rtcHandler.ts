@@ -54,7 +54,7 @@ class PartnerConnection{
         public username: string,
         public channel: string,
         public partner: string,
-        public streamAwaiter: StreamAwaiter,
+        public streamAwaiter: StreamAwaiter<MessageLike>,
         public getVideoStream,
         public sendMessageToTargetClient,
         public onTrackReceived,
@@ -205,7 +205,7 @@ export class RTCClientManager  {
     constructor(
         public username: string,
         public getChannel,
-        public streamAwaiter: StreamAwaiter,
+        public streamAwaiter: StreamAwaiter<MessageLike>,
         public getVideoStream,
         public sendMessageToTargetClient,
         public onTrackReceived,
@@ -214,7 +214,7 @@ export class RTCClientManager  {
     }
     private waitForRTCOffer = () => {
         const that = this;
-        this.streamAwaiter.waitFor<WebRTCOfferStreamResponse>(m => 
+        this.streamAwaiter.waitFor(m => 
                 (m as WebRTCOfferStreamResponse).payload.description && 
                 !(m as any as WebRTCAnswerOfferResponse).payload.originalOfferFrom && 
                 (m as WebRTCOfferStreamResponse).isResponse && 
@@ -266,7 +266,7 @@ export class RTCClientManager  {
     }
     broadCastOffer = (partnerNames:Array<string>)=>{
         console.log("broadcast", { partnerNames});
-        partnerNames.forEach(p => (this.connections[p] = this.newConnection(p)) && (this.connections[p] as PartnerConnection).startOffering());
+        partnerNames.forEach(p => !this.connections[p] && (this.connections[p] = this.newConnection(p)) && (this.connections[p] as PartnerConnection).startOffering());
     }
 }
 

@@ -8,7 +8,7 @@ export type MessageHandlerGen<M extends MessageLike> = (message: M, user: User) 
 export type MessageHandler = MessageHandlerGen<HandledRequests>;
 export type ResponseHandler = MessageHandlerGen<HandledResponses>;
 
-type RequestTypeActionHandlerMapType<M extends MessageLike> = {
+export type RequestTypeActionHandlerMapType<M extends MessageLike> = {
     [messageType in M["type"]]: {
         [actionType in TypeMapper<M>[messageType]['action']]: M extends { action: actionType, type: messageType } ?
         MessageHandlerGen<M>
@@ -17,7 +17,7 @@ type RequestTypeActionHandlerMapType<M extends MessageLike> = {
     }
 };
 export type RequestTypeActionToHandlerMap = RequestTypeActionHandlerMapType<HandledRequests>;
-// export type ResponseTypeActionToHandlerMap = RequestTypeActionHandlerMapType<HandledResponses>;
+export type ResponseTypeActionToHandlerMap = RequestTypeActionHandlerMapType<HandledResponses>;
 
 
 type RequestToResponseConverter<Req, Res> = (req: Req, originatingUser: User) => Res;
