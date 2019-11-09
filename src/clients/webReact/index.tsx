@@ -4,7 +4,7 @@ require("./main.css");
 import io from 'socket.io-client';
 import { Socket } from "socket.io";
 import { TextMessagePostRequest, UserPostRequest, HandledResponses, TextMessagePostResponse, UserPostResponse, ChannelPostResponse, HandledRequests, ChannelPostRequest, ChannelLeaveResponse } from "../../lib/messages/messages";
-import { StreamAwaiter ,StreamChecker} from "../tcpClient/streamAwaiter";
+import { StreamAwaiter ,StreamChecker} from "../apiClient/streamAwaiter";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import { newLineArt } from "../../lib/util/newline";
 import { MessageTypes, ActionTypes, MessageLike } from "../../lib/messages/message";

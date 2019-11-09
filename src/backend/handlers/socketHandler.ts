@@ -15,19 +15,22 @@ export const socketHandler = async (
         console.log("new user", { name: user.username, id: user.id, isJson, swId: socketWrapper.id, handle: socket._handle && socket._handle.fd  });
         User.addUser(user)
             .addChannel(Store.defaultChannel);
-        console.log(Object.entries(Store.getStore().users.store).map(([k, u]) => ({ name: u.username, sockets:Object.values(u.sockets.store).length})))
+        console.log(Object.entries(Store.getStore().users.store).map(([k, u]) => ({ name: u.username, sockets:Object.values(u.sockets.store)})))
 
         socketWrapper.configure(user, messageHandler);
         //timeout helps with websockets on polling transport for some reason
         setTimeout(()=>{
             socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
-            const joinChannelMessage = new ChannelPostResponse(
-                new ChannelPostRequest({
-                    channelName: Store.defaultChannel.name,
-                    switchTo: true
-                }), user
-            );
-            Store.defaultChannel.forEachUser(u => u.writeToAllSockets(joinChannelMessage))
+            
+            setTimeout(()=>{
+                const joinChannelMessage = new ChannelPostResponse(
+                    new ChannelPostRequest({
+                        channelName: Store.defaultChannel.name,
+                        switchTo: true
+                    }), user
+                );
+                Store.defaultChannel.forEachUser(u => u.writeToAllSockets(joinChannelMessage))
+            },100)
         },100)
 
     }else{

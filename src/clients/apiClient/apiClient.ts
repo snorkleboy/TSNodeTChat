@@ -1,13 +1,13 @@
-import { StreamAwaiter, StreamChecker } from "../tcpClient/streamAwaiter"
+import { StreamAwaiter, StreamChecker } from "./streamAwaiter"
 import { MessageLike, MessageTypes, ActionTypes } from "../../lib/messages/message";
-import { TextMessagePostRequest, TextMessagePostResponse, ChannelPostRequest, ChannelPostResponse, WebRTCOfferStreamResponse, UserPostResponse, ChannelLeaveResponse, WebRTCAnswerOffer, WebRTCDWSStreamResponse, UserPostRequest, WebRTCOfferStream } from "../../lib/messages/messages";
+import { TextMessagePostRequest, TextMessagePostResponse, ChannelPostRequest, ChannelPostResponse, WebRTCOfferStreamResponse, UserPostResponse, ChannelLeaveResponse, WebRTCAnswerOffer, WebRTCDWSStreamFrameResponse, UserPostRequest, WebRTCOfferStream } from "../../lib/messages/messages";
 import { RequestTypeActionHandlerMapType} from "../../lib/messages/messageTypeExport";
 type responseHandler = RequestTypeActionHandlerMapType<
     TextMessagePostResponse|
     ChannelPostResponse|
     ChannelLeaveResponse|
     WebRTCOfferStreamResponse|
-    WebRTCDWSStreamResponse
+    WebRTCDWSStreamFrameResponse
 >
 const ResponseHandler = (client: ApiClient): responseHandler=>{
     return ({
@@ -52,7 +52,7 @@ export class ApiClient{
                 onMessage:(m:TextMessagePostResponse)=>any
             },
             videos: {
-                onDWSVideo:(m:WebRTCDWSStreamResponse)=>any,
+                onDWSVideo:(m:WebRTCDWSStreamFrameResponse)=>any,
                 onVideoOfferedToThis: (m:WebRTCOfferStreamResponse)=>any
             },
             responseHandler?: responseHandler
@@ -69,24 +69,32 @@ export class ApiClient{
             this.onMessage(msg)
         }
     }
-    start = (username:string) => { 
-        return this.authenticate(username);
-    }
-    protected authenticate = (userName: string) => this.writeToHost(new UserPostRequest({
-            userName
-        }),(m:UserPostResponse)=>(
+    // start = (username:string) => { 
+        // return this.authenticate(username);
+    // }
+    authenticate = (userName: string, sendauth = null) => this.writeToHost(
+        new UserPostRequest({userName}),
+        (m:UserPostResponse)=>(
+            logr("api cleint auth check msg", {
+                m, b: (m.type === MessageTypes.login &&
+                    m.action === ActionTypes.post,
+                    !!m.payload.channels)}
+            )&&
             m.type === MessageTypes.login &&
             m.action === ActionTypes.post,
             !!m.payload.channels
-    )).then((m: UserPostResponse)=>{
-            this.session.username = userName;
-            return m
-        })
+        ),
+        sendauth
+    ).then((m: UserPostResponse)=>{
+        console.log("api client auth",{m});
+        this.session.username = userName;
+        return m
+    })
     protected onMessage = (msg:MessageLike)=>{
         this.config.responseHandler[msg.type][msg.action](msg,{username:this.session.username});
     }
-    protected writeToHost =(msg:MessageLike, waitFor:StreamChecker<MessageLike>=null,timeout=null):Promise<MessageLike>=>{
-        this.config.hostIO.write(msg)
+    protected writeToHost =(msg:MessageLike, waitFor:StreamChecker<MessageLike>=null,send=null):Promise<MessageLike>=>{
+        (send||this.config.hostIO.write)(msg)
         if (waitFor){
             return this.streamAwaiter.waitFor(waitFor)
         }else{
@@ -107,14 +115,15 @@ export class ApiClient{
     
     createChannel = (channelName) => this.writeToHost(
         new ChannelPostRequest({channelName,switchTo:true}),
-        (m: ChannelPostResponse) => {
-            const bool = (
-            
+        (m: ChannelPostResponse) =>(
             m.type === MessageTypes.channelCommand,
             m.action === ActionTypes.post,
             m.payload.channelName == channelName,
             m.payload.userThatJoined === this.session.username
-            ); console.log({ bool, m, usn: this.session.username,channelName}); return bool;}
+        )
     );
 
 }
+
+
+const logr = (...args)=>{console.log(...args); return true};

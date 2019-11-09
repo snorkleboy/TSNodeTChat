@@ -1,14 +1,12 @@
 import {IdedEntity} from "../recordStore"
-import { Socket as TCPSocket, Socket} from "net";
+import { Socket as TCPSocket} from "net";
 import { Socket as Websocket } from "socket.io";
 import { User } from "../user/user";
-import { TCPIdentityGetter, websocketIdentityGetter } from "./identityGetter";
-import { Store } from "../store";
+import { websocketIdentityGetter, checkLoginMessage,handleIdentityChunk } from "./identityGetter";
 import { MessageHandlerGen } from "../../messages/messageTypeExport";
-import { HandledRequests, TextMessagePostRequest, TextMessagePostResponse, WebRTCOfferStreamResponse, WebRTCDWSStreamResponse, WebRTCDWSStreamFrame, WebRTCAnswerOffer } from "../../messages/messages";
-import { DestinationTypes, MessageLike, MessageTypes, ActionTypes } from "../../messages/message";
-import { newLineArt } from "../../util/newline";
-import { getNextMessage } from "../../util/getNextMessage";
+import { HandledRequests, UserPostRequest } from "../../messages/messages";
+import {  MessageLike } from "../../messages/message";
+import { TCPClient } from "../../../clients/tcpClient/tcpClient";
 
 type ConfigureSocket = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>void;
 const configureSocket: ConfigureSocket = function(user: User, messageHandler: MessageHandlerGen<HandledRequests>) {
@@ -75,76 +73,87 @@ export class FakeServerSocket extends SocketWrapper<any>{
     getIdentity = async () => ({user:User.serverUser,isJson:true})
 }
 User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
+// write = (msg: MessageLike) => {
+//     if (this.isJson) {
+//         this.socket.write(JSON.stringify(msg), e => {
+//             if (e) {
+//                 console.log("tcp socket write error", { e, msg, sockId: this.id });
+//                 this.socket.emit("close");
+//             }
+//         })
+//     } else {
+//         if (
+//             msg.type === MessageTypes.textMessage &&
+//             msg.action === ActionTypes.post &&
+//             (msg as TextMessagePostResponse).isResponse && (msg as TextMessagePostResponse).payload.from.name !== this.user.username
+//         ) {
+//             const lineStart = newLineArt((msg as TextMessagePostResponse).payload.from.name, "all", true)
+//             this.socket.write(`\n${lineStart}${(msg as TextMessagePostResponse).payload.body}\n`, e => {
+//                 if (e) {
+//                     console.log("raw tcp socket write error", { e, msg, sockId: this.id });
+//                     this.socket.emit("close");
+//                 }
+//             })
+//         } else if (
+//             msg.type === MessageTypes.WRTCAV &&
+//             msg.action === ActionTypes.offer &&
+//             !this.videoPartner
+//         ) {
+//             const mess = msg as WebRTCOfferStreamResponse
+//             this.socket.write(`got video offer from ${mess.payload.from}, "{width},{height}" to accept or anything else to decline:`)
+//             this.videoPartner = mess.payload.from;
+//             getNextMessage(this.socket, 10000)
+//                 .then((v) => {
+//                     const m = v.toString();
+//                     const [w, h] = m.split("\n")[0].split(",");
+//                     console.log("\nHERE\n", { m, w, h })
+//                     let areNums;
+//                     try {
+//                         areNums = parseInt(h) && parseInt(w)
+//                     } catch (e) {
 
+//                     }
+//                     if (w !== 'n' && areNums) {
+//                         this.messageHandler(new WebRTCAnswerOffer(mess, { username: this.user.username }, { width: w, height: h }, true), this.user);
+//                     } else {
+//                         this.socket.write(`declined`)
+//                         this.videoPartner = null;
+//                     }
+//                 })
+//                 .catch(e => console.log({ e }));
+//         } else if (
+//             msg.type === MessageTypes.WRTCAV &&
+//             msg.action === ActionTypes.post &&
+//             msg.payload.video
+//         ) {
+//             this.socket.write(`\n${(msg as WebRTCDWSStreamFrame).payload.video}\n`, e => {
+//                 if (e) {
+//                     console.log("raw tcp socket write error", { e, msg, sockId: this.id });
+//                     this.socket.emit("close");
+//                 }
+//             })
+//         }
+//     }
+
+// }
 export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
-    isJson:Boolean;
+    clientSendsJson:Boolean;
     user: User;
     videoPartner:any = false;
+    tcpClient:TCPClient;
+    notJsonDataCBs = [];
     configure = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>{
         configureSocket.bind(this)(user, messageHandler);
     }
-    write = (msg:MessageLike)=>{
-        if(this.isJson){
-                this.socket.write(JSON.stringify(msg), e => {
-                if (e) {
-                    console.log("tcp socket write error", { e, msg, sockId: this.id });
-                    this.socket.emit("close");
-                }
-            })
+    write = (msg: MessageLike) => {
+        if(this.clientSendsJson){
+            let msgS = JSON.stringify(msg)
+            console.log("write to socket.write", { msgS,isjsonClient:this.clientSendsJson})
+            this.socket.write(msgS);
         }else{
-            if (
-                msg.type === MessageTypes.textMessage && 
-                msg.action === ActionTypes.post && 
-                (msg as TextMessagePostResponse).isResponse && (msg as TextMessagePostResponse).payload.from.name !== this.user.username
-            ){
-                const lineStart = newLineArt((msg as TextMessagePostResponse).payload.from.name,"all",true)
-                this.socket.write(`\n${lineStart}${(msg as TextMessagePostResponse).payload.body}\n`, e => {
-                    if (e) {
-                        console.log("raw tcp socket write error", { e, msg, sockId: this.id });
-                        this.socket.emit("close");
-                    }
-                })
-            }else if (
-                msg.type === MessageTypes.WRTCAV &&
-                msg.action === ActionTypes.offer &&
-                !this.videoPartner
-            ){
-                const mess = msg as WebRTCOfferStreamResponse
-                this.socket.write(`got video offer from ${mess.payload.from}, "{width},{height}" to accept or anything else to decline:`)
-                this.videoPartner = mess.payload.from;
-                getNextMessage(this.socket,10000)
-                    .then((v)=>{
-                        const m = v.toString();
-                        const [w,h] = m.split("\n")[0].split(",");
-                        console.log("\nHERE\n", { m,w,h })
-                        let areNums;
-                        try{
-                            areNums = parseInt(h) && parseInt(w)
-                        }catch(e){
-
-                        }
-                        if (w !== 'n' && areNums){
-                            this.messageHandler(new WebRTCAnswerOffer(mess,{username:this.user.username},{width:w,height:h},true),this.user);
-                        }else{
-                            this.socket.write(`declined`)
-                            this.videoPartner = null;
-                        }
-                    })
-                    .catch(e=>console.log({e}));
-            }else if(
-                msg.type === MessageTypes.WRTCAV &&
-                msg.action === ActionTypes.post &&
-                msg.payload.video
-            ){
-                this.socket.write(`\n${(msg as WebRTCDWSStreamFrame).payload.video}\n`, e => {
-                    if (e) {
-                        console.log("raw tcp socket write error", { e, msg, sockId: this.id });
-                        this.socket.emit("close");
-                    }
-                })
-            }
+            console.log("write to tcpClient.receiveFromServer", { msg, isjsonClient: this.clientSendsJson })
+            this.tcpClient.receiveFromServer(msg);
         }
-
     }
     private onDataIsJson = (m,next)=>{
         let json;
@@ -155,17 +164,15 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
         }
         next(json);
     }
-    private onDataNotJson = (m,next)=>{
-        console.error("raw client message, PARTAILLY IMPLIMENTED",{m});
-        const str = m.toString();
-        const channel = (c => c ? c.name : "all")(this.user.channels.getList[0]);
-        const json = new TextMessagePostRequest(str,channel)
-        next(json);
+    private onDataNotJson = (m,cb)=>{
+        let str = m.toString().replace(/\n$/, "")
+        this.tcpClient.receiveFromClient(str);
     }
     on = (e,cb)=>{
         if(e === "data"){
+            !this.clientSendsJson && this.notJsonDataCBs.push(cb);
             this.socket.on("data",(m)=>{
-                if(this.isJson){
+                if(this.clientSendsJson){
                     this.onDataIsJson(m,cb);
                 }else{
                     this.onDataNotJson(m,cb);
@@ -175,25 +182,53 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
             this.socket.on(e,cb);
         }
     }
+    //todo
     //doesnt give back json, as it may not be json for some clients... needs to be split into json client and bare client with adapter
     once = (e, cb) => this.socket.once(e,cb);
-    getIdentity = () => {
-        const prom =  TCPIdentityGetter(this)   
-        .then(ret=>{
-            if(!ret.err){
-                this.socket.write(`\n you are now in channel 'all':\n`, e => {
-                    if (e) {
-                        console.log("raw tcp socket write error", { e, msg:"welcome message", sockId: this.id });
-                        this.socket.emit("close");
+    makeTCPHandler = ()=>{
+        const rawTCPHandler = new TCPClient(
+            {
+                sendToClient: (m) => {
+                    this.socket.write(`\n\n\n\n\n\n\n\n\n${m}`)
+                },
+                sendToServer: (m) => {
+                    if (this.notJsonDataCBs.length < 1) {
+                        console.warn("send to server called with no on data callbacks", { m, this: this });
                     }
-                })
+                    this.notJsonDataCBs.forEach(cb => cb(m));
+                },
+            }, () => {
+                rawTCPHandler.start();
             }
-            this.isJson = ret.isJson;
-            this.user = ret.user;
-            return ret;
-        })
-        
-        return prom; 
+        );
+        return rawTCPHandler;
+    }
+    getIdentity = () => {
+        const that = this;
+        return new Promise<{ isJson: Boolean, user: User, err: Boolean }>((resolve, e) => {
+            const rawTCPHandler = this.makeTCPHandler();
+            let identityReturn;
+            rawTCPHandler.authenticate(m=>{
+                identityReturn = handleIdentityChunk(m, this);
+                const { isJson, err, user={}, chunk } = identityReturn;
+                this.clientSendsJson = isJson;
+                this.user = user;
+
+                console.log("auth", { isJson, m, user:(user as User).username }, isJson?"resolving identity as JSONTCPClient":"waiting for raw tcp handler for identity");
+                if (isJson){
+                    resolve(identityReturn)
+                }
+                return !isJson;
+            },(m)=>{
+                that.tcpClient = rawTCPHandler;
+                identityReturn = checkLoginMessage(m, this);
+                console.log("auth", { m },"raw tcp style");
+                resolve(identityReturn);
+            }
+            )     
+            this.socket.once("data", (m) => rawTCPHandler.receiveFromClient(m.toString().replace(/\n$/, "")));
+
+        });
     }
     destroy = ()=>this.socket.destroy();
 

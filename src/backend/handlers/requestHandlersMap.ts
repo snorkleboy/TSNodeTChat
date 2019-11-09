@@ -1,6 +1,6 @@
 import { RequestTypeActionToHandlerMap} from "../../lib/messages/messageTypeExport";
 import { MessageTypes, ActionTypes, DestinationTypes, Destination, MessageLike, Response } from "../../lib/messages/message";
-import { TextMessagePostResponse, ChannelPostResponse, ChannelGetResponse, WebRTCOfferStreamResponse, HandledRequests, WebRTCAnswerOfferResponse, WebRTCDWSStreamResponse } from "../../lib/messages/messages";
+import { TextMessagePostResponse, ChannelPostResponse, ChannelGetResponse, WebRTCOfferStreamResponse, HandledRequests, WebRTCAnswerOfferResponse, WebRTCDWSStreamFrameResponse } from "../../lib/messages/messages";
 import { Channel } from "../../lib/store/channel/channel";
 import { Store } from "../../lib/store/store";
 import { User } from "../../lib/store/user/user";
@@ -39,7 +39,7 @@ export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
     [MessageTypes.WRTCAV]: {
         [ActionTypes.post]: (m, u) => simpleSendHandler(
             m, u,
-            () => new WebRTCDWSStreamResponse(m),
+            () => new WebRTCDWSStreamFrameResponse(m),
             { allowChannelDestination: false }
         ),
         [ActionTypes.offer]: (message, user) => simpleSendHandler(

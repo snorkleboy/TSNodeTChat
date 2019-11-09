@@ -146,7 +146,7 @@ export class WebRTCDWSStreamFrame implements Request{
         val: { channel: msg.destination.val.channel,user:msg.payload.answerFrom}
     }) { }
 }
-export class WebRTCDWSStreamResponse extends EchoResponse<WebRTCDWSStreamFrame>{ }
+export class WebRTCDWSStreamFrameResponse extends EchoResponse<WebRTCDWSStreamFrame>{ }
 
 export class WebRTCOfferStream implements Request {
     type: MessageTypes.WRTCAV = MessageTypes.WRTCAV

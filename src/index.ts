@@ -1,2 +1,2 @@
 import "./backend/index";
-import "./clients/tcpClient/index";
+import "./clients/tcpClient/terminalClient";

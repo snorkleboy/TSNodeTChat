@@ -31,7 +31,9 @@ export const TCPHTTPSwitchServer = (
                         socket.emit("data", msg);
                     } else {
                         socketHandler(socket);
-                        socket.emit("data", msg);
+                        if(msg){
+                            socket.emit("data", msg);
+                        }
                     }
                 } catch (error) {
                     console.error("socket to server level error", { error, socket });

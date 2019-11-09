@@ -1,6 +1,6 @@
 import { PureComponent } from "react";
 import { WebRTCOfferStream, WebRTCAnswerOffer, WebRTCIceCandidate, WebRTCAnswerOfferResponse, WebRTCOfferStreamResponse, WebRTCDWSStreamFrame } from "../../lib/messages/messages";
-import {StreamAwaiter} from "../tcpClient/streamAwaiter"
+import {StreamAwaiter} from "../apiClient/streamAwaiter"
 import { DestinationTypes, ActionTypes, MessageLike, Response, SingleUserDestination } from "../../lib/messages/message";
 import CanvasASCII from "jw-canvas-ascii";
 var asciiPixels = require('ascii-pixels')

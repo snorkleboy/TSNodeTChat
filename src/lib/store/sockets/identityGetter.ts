@@ -4,12 +4,12 @@ import { Store } from "../store";
 import { User } from "../user/user";
 
 import { getNextMessage} from "../../util/getNextMessage";
-import { TCPSocketWrapper, WebSocketWrapper, WrappedSocket } from "./socket";
+import { TCPSocketWrapper, WebSocketWrapper, WrappedSocket, SocketWrapper } from "./socket";
 //at this point the socket is 'confired' not HTTP, but it may be a full json client or a 'barecleint' like telnet or netcat.
 //if an http message took longer than 500ms than it may be routed here
 // if it takes longer than 10000ms for any message to come through this will bail out
 
-type identityReturn = { user: User, isJson: Boolean,err:any };
+type identityReturn = { user: User, isJson: Boolean,err:any,chunk?:any };
 type IdentityGetter =(socket:WrappedSocket)=> Promise<identityReturn>;
 
 export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketWrapper): Promise<identityReturn> => {
@@ -32,29 +32,31 @@ export const websocketIdentityGetter: IdentityGetter = async (socket: WebSocketW
     return {user,isJson,err};
 }
 //this still may be a bare client or a json client
-export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper): Promise<identityReturn>=>{
+export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper): Promise<identityReturn &{chunk}>=>{
     const endCB = () => {
         console.log('Closing connection with the client before Identity')
     }
     const errorCB = err => console.log(`Error before identity: ${err}`)
     socket.socket.on('end', endCB);
     socket.socket.on('error', errorCB);
-    socket.socket.write("please enter name:");
     let err;
     let user;
     let isJson;
+    let chunk
     let tries = 0;
     while (!user && !err && tries<3) {
-        const chunk = await getNextMessage(socket,10000)
+        const chunkMSG = await getNextMessage(socket,10000)
             .catch(e => {
                 err = true;
                 console.error("error getting identity message", e)
             })
-        if (chunk) {
+        if (chunkMSG) {
             ({
                 user,
-                isJson
-            } = handleIdentityChunk(chunk, socket));
+                isJson,
+                chunk,
+                err
+            } = handleIdentityChunk(chunkMSG, socket));
         }
     }
     socket.socket.removeListener('end', endCB);
@@ -62,10 +64,11 @@ export const TCPIdentityGetter: IdentityGetter =async (socket: TCPSocketWrapper)
     return {
         user,
         isJson,
-        err
+        err,
+        chunk
     };
 }
-const checkLoginMessage = (parsed, socket): {user:User,isJson:Boolean}=>{
+export const checkLoginMessage = (parsed, socket: WrappedSocket): {user:User,isJson:Boolean}=>{
     let user;
     let isJson;
     if (parsed && parsed.type && parsed.type === MessageTypes.login && parsed.action === ActionTypes.post && parsed.payload && parsed.payload.userName) {
@@ -78,7 +81,7 @@ const checkLoginMessage = (parsed, socket): {user:User,isJson:Boolean}=>{
     }
     return {user,isJson};
 }
-const handleIdentityChunk = (chunk, socket): identityReturn => {
+export const handleIdentityChunk = (chunk, socket: TCPSocketWrapper): identityReturn & {chunk} => {
     //if json, try parse as login message or try again, else interpret non-json as user name;
     let parsed
     let userInfo;
@@ -88,23 +91,21 @@ const handleIdentityChunk = (chunk, socket): identityReturn => {
 
     try {
         parsed = JSON.parse(chunk);
-        ({ user, isJson } = checkLoginMessage(parsed, socket));
+        if(parsed){
+            ({ user, isJson } = checkLoginMessage(parsed, socket));
+        }else{
+            err = "not json";
+            isJson = false;
+        }
         //if initial message is not json then it is interpreted as a name
     } catch (error) {
-        userInfo = chunk.toString("utf8");
-
-        if (userInfo && userInfo.length > 0) {
-            user = User.createUser(userInfo, socket);
-            isJson = false;
-        }else{
-            err = true;
-        }
-        console.log("handle identity chunk not json", { err, chunk, userInfo });
-
+        err = error;
+        isJson = false;
     }
     return {
         user,
         isJson,
-        err
+        err,
+        chunk
     }
 }
