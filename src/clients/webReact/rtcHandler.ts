@@ -1,6 +1,6 @@
 import { PureComponent } from "react";
 import { WebRTCOfferStream, WebRTCAnswerOffer, WebRTCIceCandidate, WebRTCAnswerOfferResponse, WebRTCOfferStreamResponse, WebRTCDWSStreamFrame } from "../../lib/messages/messages";
-import {StreamAwaiter} from "../apiClient/streamAwaiter"
+import {StreamAwaiter, StreamChecker} from "../apiClient/streamAwaiter"
 import { DestinationTypes, ActionTypes, MessageLike, Response, SingleUserDestination } from "../../lib/messages/message";
 import CanvasASCII from "jw-canvas-ascii";
 var asciiPixels = require('ascii-pixels')
@@ -204,11 +204,11 @@ export class RTCClientManager  {
     localVideoDWSCache: LocalVideoCanvasCache = null;
     constructor(
         public username: string,
-        public getChannel,
+        public getChannel:()=>string,
         public streamAwaiter: StreamAwaiter<MessageLike>,
-        public getVideoStream,
-        public sendMessageToTargetClient,
-        public onTrackReceived,
+        public getVideoStream:()=>Promise<{ref:any,stream:any}>,
+        public sendMessageToTargetClient: (msg: MessageLike, checker: StreamChecker<MessageLike>) => Promise<MessageLike>,
+        public onTrackReceived:(e:any,partnerName:string)=>any,
     ){
         this.waitForRTCOffer();
     }
@@ -226,6 +226,7 @@ export class RTCClientManager  {
                 this.onOffer(potentialPartner, msg);
             }).catch(e => console.log("receive offer went wront", { e }));
     }
+    onReceiveOffer = (msg) => this.onOffer(msg.payload.from,msg)
     private onOffer = (potentialPartner,msg)=>{
         if (!this.connections[potentialPartner]) {
             console.log("manager got new offer from unknown parnter", potentialPartner, { connections: this.connections, potentialPartner, msg, exists: !!this.connections[potentialPartner], this: this })

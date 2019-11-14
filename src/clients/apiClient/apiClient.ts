@@ -1,7 +1,8 @@
 import { StreamAwaiter, StreamChecker } from "./streamAwaiter"
 import { MessageLike, MessageTypes, ActionTypes } from "../../lib/messages/message";
-import { TextMessagePostRequest, TextMessagePostResponse, ChannelPostRequest, ChannelPostResponse, WebRTCOfferStreamResponse, UserPostResponse, ChannelLeaveResponse, WebRTCAnswerOffer, WebRTCDWSStreamFrameResponse, UserPostRequest, WebRTCOfferStream } from "../../lib/messages/messages";
+import { TextMessagePostRequest, TextMessagePostResponse, ChannelPostRequest, ChannelPostResponse, WebRTCOfferStreamResponse, UserPostResponse, ChannelLeaveResponse, WebRTCAnswerOffer, WebRTCDWSStreamFrameResponse, UserPostRequest, WebRTCOfferStream, WebRTCIceCandidate } from "../../lib/messages/messages";
 import { RequestTypeActionHandlerMapType} from "../../lib/messages/messageTypeExport";
+import { RTCClientManager } from "../webReact/rtcHandler";
 type responseHandler = RequestTypeActionHandlerMapType<
     TextMessagePostResponse|
     ChannelPostResponse|
@@ -9,6 +10,7 @@ type responseHandler = RequestTypeActionHandlerMapType<
     WebRTCOfferStreamResponse|
     WebRTCDWSStreamFrameResponse
 >
+
 const ResponseHandler = (client: ApiClient): responseHandler=>{
     return ({
         [MessageTypes.textMessage]:{
@@ -26,20 +28,27 @@ const ResponseHandler = (client: ApiClient): responseHandler=>{
         },
         [MessageTypes.WRTCAV]:{
             [ActionTypes.offer]:(msg)=>{
-                client.config.videos.onVideoOfferedToThis(msg)
+                (
+                    client.config.videos?.dwsVideo?.onVideoOfferedToThis 
+                    ?? (()=>console.warn("offer not implimented",{msg,client}))
+                )(msg)
             },
             [ActionTypes.post]:(msg)=>{
-                client.config.videos.onDWSVideo(msg);
-            }
+                (
+                    client.config.videos?.dwsVideo?.onDWSVideo 
+                    ?? (() => console.log("not implimented", { msg, client}))
+                )(msg)
+            },
         },
 
     })
 }
 
 export class ApiClient{
-    streamAwaiter: StreamAwaiter<MessageLike>;
+    webRTCManager: RTCClientManager
     session = {
         username:null,
+        channelName:null
     }
     constructor(
         public config:{
@@ -52,57 +61,79 @@ export class ApiClient{
                 onMessage:(m:TextMessagePostResponse)=>any
             },
             videos: {
-                onDWSVideo:(m:WebRTCDWSStreamFrameResponse)=>any,
-                onVideoOfferedToThis: (m:WebRTCOfferStreamResponse)=>any
+                dwsVideo?:{
+                    onDWSVideo?: (m: WebRTCDWSStreamFrameResponse) => any,
+                    onVideoOfferedToThis?: (m: WebRTCOfferStreamResponse) => any,
+                }
+                webRTC?:{
+                    getStream: () => Promise<{ ref: any, stream: any }>,
+                    onTrack: (e: any, partnerName: string) => any
+                }
             },
-            responseHandler?: responseHandler
+            responseHandler?: responseHandler,
+            
         },
+        public streamAwaiter = new StreamAwaiter<MessageLike>()
 
     ){
-        this.streamAwaiter = new StreamAwaiter();
+        if(config.videos.dwsVideo && config.videos.webRTC){
+            console.warn("should only have one video type config");
+        }
         if(!config.responseHandler){
             this.config.responseHandler = ResponseHandler(this);
         }
+
     }
     receiveFromServer = (msg)=>{
         if (!this.streamAwaiter.onData(msg)) {
             this.onMessage(msg)
         }
     }
-    // start = (username:string) => { 
-        // return this.authenticate(username);
-    // }
     authenticate = (userName: string, sendauth = null) => this.writeToHost(
         new UserPostRequest({userName}),
         (m:UserPostResponse)=>(
-            logr("api cleint auth check msg", {
-                m, b: (m.type === MessageTypes.login &&
-                    m.action === ActionTypes.post,
-                    !!m.payload.channels)}
-            )&&
             m.type === MessageTypes.login &&
             m.action === ActionTypes.post,
             !!m.payload.channels
         ),
         sendauth
     ).then((m: UserPostResponse)=>{
-        console.log("api client auth",{m});
         this.session.username = userName;
+        this.session.channelName = m.payload.channels[0].name;
+        if(this.config.videos.webRTC){
+            this.webRTCManager = this.webRTCManager || new RTCClientManager(
+                this.session.username,
+                () => this.session.channelName,
+                this.streamAwaiter,
+                this.config.videos.webRTC.getStream,
+                this.writeToHost,
+                this.config.videos.webRTC.onTrack
+            )
+        }
         return m
     })
     protected onMessage = (msg:MessageLike)=>{
-        this.config.responseHandler[msg.type][msg.action](msg,{username:this.session.username});
+        const handler = this.config.responseHandler?.[msg.type]?.[msg.action] ?? (() => { });//console.warn("not handled message",{msg})
+        handler(msg, { username: this.session.username })
     }
     protected writeToHost =(msg:MessageLike, waitFor:StreamChecker<MessageLike>=null,send=null):Promise<MessageLike>=>{
         (send||this.config.hostIO.write)(msg)
         if (waitFor){
-            return this.streamAwaiter.waitFor(waitFor)
+            return this.streamAwaiter.waitFor(waitFor);
         }else{
             return Promise.resolve(null);
         }
     }
     offerVideo = (users)=>{
-        console.warn("not implemented");
+        if(this.config.videos.webRTC){
+            if(this.session.username && this.session.channelName){
+                this.webRTCManager.broadCastOffer(users);
+            }else{
+                console.error("must authenticate before offering video");
+            }
+        }else{
+            console.error("need webrtc config to offer video");
+        }
     }
     sendTextMessage = (body: string, channel: string) => this.writeToHost(
         new TextMessagePostRequest(body, channel),
@@ -121,7 +152,10 @@ export class ApiClient{
             m.payload.channelName == channelName,
             m.payload.userThatJoined === this.session.username
         )
-    );
+    ).then((m: ChannelPostResponse)=>{
+        this.session.channelName = m.payload.channelName
+        return m;
+    });
 
 }
 

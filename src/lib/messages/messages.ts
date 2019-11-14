@@ -2,6 +2,15 @@ import { Request, Response, ActionTypes, DestinationTypes, MessageTypes, Destina
 
 import { User } from "../store/user/user";
 import { Store } from "../store/store";
+
+const isChannelPostResponse = (msg: HandledResponses | UserPostResponse) => !!(msg as ChannelPostResponse).payload.userThatJoined
+const isChannelLeaveResponse = (msg: HandledResponses | UserPostResponse): msg is ChannelLeaveResponse => msg.type === MessageTypes.channelCommand && msg.action === ActionTypes.patch && !!msg.payload.channelLeft
+const isLoginResponse = (msg: HandledResponses | UserPostResponse): msg is UserPostResponse => !!((msg as UserPostResponse).payload.userName);
+
+const isResponseTo = (req: HandledRequests | UserPostRequest, res: HandledResponses | UserPostResponse, otherCheck: (r: HandledResponses | UserPostResponse) => boolean) => !!(otherCheck(res) && res.type === req.type && res.action === req.action);
+const isTextResponse = (msg: HandledResponses | UserPostResponse): msg is TextMessagePostResponse => !!(msg as TextMessagePostResponse).payload.body
+
+
 export type HandledRequests =
     | TextMessagePostRequest
     | ChannelPostRequest

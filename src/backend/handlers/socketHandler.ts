@@ -20,6 +20,7 @@ export const socketHandler = async (
         socketWrapper.configure(user, messageHandler);
         //timeout helps with websockets on polling transport for some reason
         setTimeout(()=>{
+            console.log("write auth response to",user.username)
             socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
             
             setTimeout(()=>{

@@ -33,7 +33,7 @@ export const simpleSendHandler = <Req extends HandledRequests, Res extends Respo
                     echo ?
                         [otherUser, user]
                         :
-                        [user]
+                        [otherUser]
                 ).forEach(u => u.writeToAllSockets(responseMessage()))
             }else{
                 console.error("attempted to send message to invalid channel/user combo",{message,user,otherUser,channel,otherUserName})
