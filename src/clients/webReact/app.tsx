@@ -58,14 +58,13 @@ export class App extends React.Component {
         const str = JSON.stringify(msg);
         socket.emit(websocketMessageEventName, str);
     }
-    setSocket = (socket) => {
+    setSocketThenAuthenticate = (socket) => {
         document.title = this.state.userName;
         this.setState({ socket });
         this.configureAPIClient()
         this.apiClient.authenticate(this.state.userName)
             .then(msg => this.setState({
                 auth: true,
-                debug: console.log("auth", { msg }),
                 channels: msg.payload.channels.map(c => c.name),
                 channelsObj: ((c) => { const obj = {}; c.forEach(c => obj[c.name] = c); return obj })(msg.payload.channels),
                 currentChannelUsers: msg.payload.channels[0].users,
@@ -89,52 +88,42 @@ export class App extends React.Component {
             }
         })
     }
-    configureAPIClient = () => {
-        this.apiClient = new ApiClient({
-            hostIO: {
-                write: (msg: HandledRequests) => this.sendToServer(this.state.socket, msg)
-            },
-            channels: {
-                onChannelUsersChanged: (msg) => this.removeChannel(msg.payload.channelLeft, msg.payload.user.username),
-                onNewChannel: (msg) => this.addChannel(msg.payload.channelName, msg.payload.userThatJoined),
-            },
-            messages: {
-                onMessage: (msg) => {
-                    this.setState({
-                        msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
-                    })
-                }
-            },
-            videos: {
-                webRTC: {
-                    getStream: this.getVideoStream,
-                    onTrack: (e, partner) => {
-                        console.log("on track callback", { e, partner, partners: this.state.partners });
-                        this.getVideoStream()
-                            .then(s => this.startLocalVideo(s.stream))
+    configureAPIClient = () => this.apiClient = new ApiClient({
+        hostIO: {
+            write: (msg: HandledRequests) => this.sendToServer(this.state.socket, msg)
+        },
+        channels: {
+            onChannelUsersChanged: (msg) => this.removeChannel(msg.payload.channelLeft, msg.payload.user.username),
+            onNewChannel: (msg) => this.addChannel(msg.payload.channelName, msg.payload.userThatJoined),
+        },
+        messages: {
+            onMessage: (msg) => {
+                this.setState({
+                    msgs: [...this.state.msgs, `${newLineArt(msg.payload.from.name, this.state.currentChannel)} ${msg.payload.body}`],
+                })
+            }
+        },
+        videos: {
+            webRTC: {
+                getStream: this.getVideoStream,
+                onTrack: (e, partner) => {
+                    console.log("on track callback", { e, partner, partners: this.state.partners });
+                    this.getVideoStream()
+                        .then(s => this.startLocalVideo(s.stream))
 
-                        this.setState({
-                            partners: {
-                                ...this.state.partners,
-                                [partner]: {
-                                    videoWebCamRef: React.createRef(),
-                                    stream: e.streams[0]
-                                }
+                    this.setState({
+                        partners: {
+                            ...this.state.partners,
+                            [partner]: {
+                                videoWebCamRef: React.createRef(),
+                                stream: e.streams[0]
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             }
-        });
-    }
-
-    startLocalVideo = (stream) => {
-        console.log('start local video', { stream });
-        const video = this.videoWebCamRefLoc.current;
-        if (video && !video.srcObject) {
-            video.srcObject = stream;
         }
-    }
+    });
     getVideoStream = () => {
         if (this.state.localStream) {
             return Promise.resolve({ stream: this.state.localStream, ref: this.videoWebCamRefLoc });
@@ -146,6 +135,13 @@ export class App extends React.Component {
                         stream: s, ref: this.videoWebCamRefLoc
                     };
                 });
+        }
+    }
+    startLocalVideo = (stream) => {
+        console.log('start local video', { stream });
+        const video = this.videoWebCamRefLoc.current;
+        if (video && !video.srcObject) {
+            video.srcObject = stream;
         }
     }
     startVideoBroadcast = async () => {
@@ -201,12 +197,10 @@ export class App extends React.Component {
 
     render = () => (
         <section className="top" >
+            {console.log(this.state)}
             <Socketer
-                setSocket={(socket) => this.setSocket(socket)}
-                onMessage={(msg) => {
-                    console.log("from server", { msg });
-                    this.apiClient.receiveFromServer(msg)
-                }}
+                setSocket={(socket) => this.setSocketThenAuthenticate(socket)}
+                onMessage={(msg) => this.apiClient.receiveFromServer(msg)}
             />
             <div>
                 current channel:{this.state.currentChannel}
@@ -214,7 +208,6 @@ export class App extends React.Component {
             </div>
             <button onClick={() => this.startVideoBroadcast()}>vc</button>
             <div className="flex-row">
-                {console.log(this.state)}
                 <ChannelBox
                     channelsObj={this.state.channelsObj}
                     createChannelPostMessage={this.createChannelPostMessage}
