@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { PartnersDict, ChannelObj} from "./index";
+import { PartnersDict, ChannelObj} from "./app";
 import { useState, useEffect } from "react";
 import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import io from 'socket.io-client';
