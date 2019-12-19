@@ -29,28 +29,6 @@ const logdebug = (...args)=>{
 }
 
 type ComponentState = clientData & { close: boolean, auth: boolean,msgs:Array<any> };
-const handleVideoConfigResponse = (v, sendToServer, sendToClient,offerMsg)=>{
-    const m = v.toString();
-    const [w, h] = m.split("\n")[0].split(",");
-    let areNums;
-    try {
-        areNums = parseInt(h) && parseInt(w)
-    } catch (e) {
-        areNums = false;
-    }
-    if (w !== 'n' && areNums) {
-        sendToServer(new WebRTCAnswerOffer(
-            offerMsg,
-            { username: this.state.name },
-            { width: w, height: h },
-            true
-        )
-        )
-    } else {
-        sendToClient("declined video offer");
-        this.state.videoPartner = null;
-    }
-}
 export class TCPClient{
     protected hostAPIclient:ApiClient;
     protected clientStreamAwaiter: StreamAwaiter<string> =new StreamAwaiter();
@@ -112,6 +90,28 @@ export class TCPClient{
                 return null;
             }
         })
+    protected handleVideoConfigResponse = (v, sendToServer, sendToClient, offerMsg) => {
+        const m = v.toString();
+        const [w, h] = m.split("\n")[0].split(",");
+        let areNums;
+        try {
+            areNums = parseInt(h) && parseInt(w)
+        } catch (e) {
+            areNums = false;
+        }
+        if (w !== 'n' && areNums) {
+            sendToServer(new WebRTCAnswerOffer(
+                offerMsg,
+                { username: this.state.name },
+                { width: w, height: h },
+                true
+            )
+            )
+        } else {
+            sendToClient("declined video offer");
+            this.state.videoPartner = null;
+        }
+    }
     protected makeApiClient = (sendToServer, sendToClient)=>{
         this.hostAPIclient = new ApiClient({
             hostIO: {
@@ -140,7 +140,7 @@ export class TCPClient{
                         return this.promptClient(
                             `got video offer from ${msg.payload.from}, "{width},{height}" to accept or anything else to decline:`, true
                         ).then(v => {
-                            handleVideoConfigResponse(v, sendToServer, sendToClient, msg);
+                            this.handleVideoConfigResponse(v, sendToServer, sendToClient, msg);
                         })
                     }
                 }
