@@ -1,3 +1,3 @@
 #!/bin/bash
 echo "starting client"
-node ./build/clients/tcpClient/index.js
+node ./build/src/clients/tcpClient/index.js

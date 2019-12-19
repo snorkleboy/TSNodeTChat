@@ -9,7 +9,9 @@ import { Socket as tcpsocket } from "net";
 import { TCPSocketWrapper, RawSocket } from "../lib/store/sockets/socket";
 import * as fs from 'fs';
 
-
+const env = process.env.enviroment || 'development';
+const config = require(`./config/config.${env}.js`).default
+console.log({env,config});
 const myLogFileStream = fs.createWriteStream("./logs/server.log");
 const myConsole = new console.Console(myLogFileStream, myLogFileStream);
 const oldLog = console.log;
@@ -37,7 +39,7 @@ console.log("timeStamp format = Days:minutes:seconds")
 
 
 const listenOptions = {
-    port: 3005
+    port: config.port
 };
 const store = Store.getStore();
 const serverWrapper = TCPHTTPSwitchServer(

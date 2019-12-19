@@ -6,7 +6,7 @@ import {messageHandler} from "./requestHandler";
 
 export const socketHandler = async (
     socket,// raw socket
-    rerouteToHttp
+    rerouteToHttp: (m) => void
 ) => {
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
     console.log("IdentityGetter try", (socket as any)._handle && (socket as any)._handle.fd && { fd: (socket as any)._handle.fd });
