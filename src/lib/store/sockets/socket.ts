@@ -7,7 +7,8 @@ import { MessageHandlerGen } from "../../messages/messageTypeExport";
 import { HandledRequests, UserPostRequest } from "../../messages/messages";
 import {  MessageLike } from "../../messages/message";
 import { TCPClient } from "../../../clients/tcpClient/tcpClient";
-
+import {identityReturn} from "./identityGetter"
+import {websocketMessageEventName} from "./socketName"
 type ConfigureSocket = (user: User, messageHandler: MessageHandlerGen<HandledRequests>)=>void;
 const configureSocket: ConfigureSocket = function(user: User, messageHandler: MessageHandlerGen<HandledRequests>) {
     const destroy = (e) => {
@@ -50,7 +51,11 @@ export abstract class SocketWrapper<T extends RawSocket> implements IdedEntity{
     abstract on:(event:string,cb)=>void;
     abstract once:(event:string,cb)=>void;
     abstract destroy:()=>void;
-    abstract getIdentity: () => Promise<{ user:User, isJson:Boolean }>;
+    abstract getIdentity: () => Promise<identityReturn>;
+    toJson = ()=>({
+        user:this.user.id,
+        fd:(this.socket as any)?._handle?.fd
+    })
     static createSocketWrapper = (socket): TCPSocketWrapper | WebSocketWrapper => {
         if (isWebSocket(socket)){
             return new WebSocketWrapper(socket, getNewSocketId());
@@ -69,7 +74,7 @@ export class FakeServerSocket extends SocketWrapper<any>{
     on = ()=>{};
     once = ()=>{};
     destroy = ()=>{};
-    getIdentity = async () => ({user:User.serverUser,isJson:true})
+    getIdentity = async () => ({ user: User.serverUser, isJson: true, isHttp:false,err:null})
 }
 User.serverUser = User.createUser("server user", new FakeServerSocket({}, -1));
 
@@ -85,10 +90,10 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     write = (msg: MessageLike) => {
         if(this.clientSendsJson){
             let msgS = JSON.stringify(msg)
-            console.log("write to socket.write", { msgS,isjsonClient:this.clientSendsJson})
+            // console.log("write to socket.write", { msgS,isjsonClient:this.clientSendsJson})
             this.socket.write(msgS);
         }else{
-            console.log("write to tcpClient.receiveFromServer", { msg, isjsonClient: this.clientSendsJson })
+            // console.log("write to tcpClient.receiveFromServer", { msg, isjsonClient: this.clientSendsJson })
             this.tcpClient.receiveFromServer(msg);
         }
     }
@@ -148,26 +153,28 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
     }
     getIdentity = () => {
         const that = this;
-        return new Promise<{ isJson: Boolean, user: User, err: Boolean }>((resolve, e) => {
+        return new Promise<identityReturn>((resolve, e) => {
             const rawTCPHandler = this.makeTCPHandler();
-            let identityReturn;
-            rawTCPHandler.authenticate(m=>{
-                identityReturn = handleIdentityChunk(m, this);
-                const { isJson, err, user={}, chunk } = identityReturn;
-                this.clientSendsJson = isJson;
-                this.user = user;
-
-                console.log("auth", { isJson, m, user:(user as User).username }, isJson?"resolving identity as JSONTCPClient":"waiting for raw tcp handler for identity");
-                if (isJson){
-                    resolve(identityReturn)
+            rawTCPHandler.authenticate(m=>
+                {
+                    const identityReturn = handleIdentityChunk(m, this);
+                    const { isJson, err, user, chunk, isHttp } = identityReturn;
+                    this.clientSendsJson = isJson;
+                    this.user = user;
+                    const message = isHttp? "rerouting to http server" :
+                        isJson ? "resolving identity as JSONTCPClient" : "waiting for raw tcp handler for identity";
+                    console.log("auth", { message,isHttp,isJson, m, fd: (this.socket as any)._handle.fd,user:(user as User)?.username }, );
+                    if (isJson || isHttp){
+                        resolve(identityReturn)
+                    }
+                    return !isJson && !isHttp;
+                },m=>
+                {
+                    that.tcpClient = rawTCPHandler;
+                    const identityReturn = checkLoginMessage(m, this);
+                    console.log("auth", { m, fd: (this.socket as any)._handle.fd },"raw tcp style");
+                    resolve({ ...identityReturn, isHttp:false});
                 }
-                return !isJson;
-            },(m)=>{
-                that.tcpClient = rawTCPHandler;
-                identityReturn = checkLoginMessage(m, this);
-                console.log("auth", { m },"raw tcp style");
-                resolve(identityReturn);
-            }
             )     
             this.socket.once("data", (m) => rawTCPHandler.receiveFromClient(m.toString().replace(/\n$/, "")));
 
@@ -177,7 +184,6 @@ export class TCPSocketWrapper extends SocketWrapper<TCPSocket> {
 
 }
 
-export const websocketMessageEventName = "data";
 const renamer = (e)=>{
     let renamedEvent = e;
     if (e === "close") {
@@ -187,7 +193,7 @@ const renamer = (e)=>{
 }
 export class WebSocketWrapper extends SocketWrapper<Websocket>{
     write = (msg) => {
-        console.log("write to websocket",this.user.username,{msg});
+        // console.log("write to websocket",this.user.username,{msg});
         this.socket.emit(websocketMessageEventName, JSON.stringify(msg))
     }
     once = (e, cb) =>this.socket.once(renamer(e), cb)

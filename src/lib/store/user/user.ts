@@ -22,6 +22,7 @@ export class User implements IdedEntity {
             console.log("user leave all channels");
         }
     }
+
     addChannel = (channel:Channel)=>{
         this.channels.add(channel);
         channel.users.add(this);

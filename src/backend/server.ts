@@ -7,7 +7,7 @@ const port = 3005;
 
 
 export const TCPHTTPSwitchServer = (
-    socketHandler:(s:RawSocket)=>void,
+    socketHandler:(s:RawSocket,httpReRout:(m)=>void)=>void,
     httpRequestHandler,
     options={}
 ) => {
@@ -26,11 +26,14 @@ export const TCPHTTPSwitchServer = (
             .then(({ httpBool, msg }) => {
                 console.log("TCP peaked for http", { httpBool, fd: socket && socket._handle && socket._handle.fd, });
                 try {
-                    if (httpBool) {
+                    const handleHTTP = (m)=>{
                         httpServer.emit("connection", socket);
-                        socket.emit("data", msg);
+                        socket.emit("data", m);
+                    }
+                    if (httpBool) {
+                        handleHTTP(msg)
                     } else {
-                        socketHandler(socket);
+                        socketHandler(socket, handleHTTP);
                         if(msg){
                             socket.emit("data", msg);
                         }

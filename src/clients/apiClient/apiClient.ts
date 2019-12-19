@@ -85,6 +85,7 @@ export class ApiClient{
 
     }
     receiveFromServer = (msg)=>{
+        console.log("recieve",{msg});
         if (!this.streamAwaiter.onData(msg)) {
             this.onMessage(msg)
         }

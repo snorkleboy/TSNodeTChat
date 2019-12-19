@@ -24,7 +24,7 @@ export const requestTypeActionHandlerMap: RequestTypeActionToHandlerMap = {
             }
             const {channel,isNew} = Channel.getOrCreateChannel(channelName);
             channel.addUser(user);
-            const res = new ChannelPostResponse(message, user);
+            const res = new ChannelPostResponse(message, user, channel);
             if (isNew){
                 res.payload.isNew = true;
                 Store.getStore().users.forEach(u => u.writeToAllSockets(res))

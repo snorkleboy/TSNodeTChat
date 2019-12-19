@@ -6,12 +6,12 @@ import {messageHandler} from "./requestHandler";
 
 export const socketHandler = async (
     socket,// raw socket
-    store: Store,
+    rerouteToHttp
 ) => {
     let socketWrapper = SocketWrapper.createSocketWrapper(socket);
     console.log("IdentityGetter try", (socket as any)._handle && (socket as any)._handle.fd && { fd: (socket as any)._handle.fd });
-    let { user, isJson } = await socketWrapper.getIdentity();
-    if(user){
+    let { user, isJson,isHttp,chunk } = await socketWrapper.getIdentity();
+    if (user){
         console.log("new user", { name: user.username, id: user.id, isJson, swId: socketWrapper.id, handle: socket._handle && socket._handle.fd  });
         User.addUser(user)
             .addChannel(Store.defaultChannel);
@@ -23,18 +23,24 @@ export const socketHandler = async (
             console.log("write auth response to",user.username)
             socketWrapper.write(new UserPostResponse(new UserPostRequest({ userName: user.username }), user));
             
+            //ensures channel message comes after user join message
             setTimeout(()=>{
                 const joinChannelMessage = new ChannelPostResponse(
                     new ChannelPostRequest({
                         channelName: Store.defaultChannel.name,
                         switchTo: true
-                    }), user
+                    }), user, Store.defaultChannel
                 );
                 Store.defaultChannel.forEachUser(u => u.writeToAllSockets(joinChannelMessage))
             },100)
         },100)
 
-    }else{
+    } else if (isHttp){
+        console.log("socket upgrade to HTPP",{fd: (socket as any)._handle && (socket as any)._handle.fd
+            , user, isJson, isHttp, chunk} )
+        rerouteToHttp(Buffer.from(chunk, 'utf8'))
+    }
+    else{
         console.error("bailed out of identity getter");
     }
 

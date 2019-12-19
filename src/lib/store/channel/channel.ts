@@ -15,13 +15,15 @@ export class Channel implements IdedEntity {
         return user; 
     }
     removeUser = (user: User,leaveMessage:ChannelLeaveRequest = null)=>{
-        this.users.remove(user);
         if (!leaveMessage) {
-            leaveMessage = new ChannelLeaveRequest({channelToLeave: this.name})
+            leaveMessage = new ChannelLeaveRequest({ channelToLeave: this.name })
         }
-        this.users.forEach(u=>u.writeToAllSockets(
-            new ChannelLeaveResponse(leaveMessage,user)
+        const originalUsers = this.users.toList();
+        this.users.remove(user);
+        originalUsers.forEach(u=>u.writeToAllSockets(
+            new ChannelLeaveResponse(leaveMessage,user,this)
         ))
+   
     }
     getUserByName = (name:string):User=>this.users.getBy(u=>u.username === name);
     getUserList = ():Array<User>=>Object.values(this.users.store)

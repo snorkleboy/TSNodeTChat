@@ -1,12 +1,12 @@
 import * as React from "react";
 require("./main.css");
-import { websocketMessageEventName } from "../../lib/store/sockets/socket";
 import { Socket } from "socket.io";
 import { newLineArt } from "../../lib/util/newline";
 import { MessageLike } from "../../lib/messages/message";
 import { ApiClient } from "../apiClient/apiClient";
 import { ChannelBox, MessageBox, Socketer, VideosEl } from "./helpers";
-import { HandledRequests } from "../../lib/messages/messages";
+import { HandledRequests, ChannelPostResponse, ChannelLeaveResponse } from "../../lib/messages/messages";
+import { websocketMessageEventName } from "../../lib/store/sockets/socketName";
 
 export type PartnersDict = { [k: string]: Partner }
 export type ChannelObj = { [k: string]: { name: string, users: Array<string>, } }
@@ -17,10 +17,8 @@ interface VCState {
 interface SocketState {
     socket: Socket,
     auth: false,
-    channels: Array<string>,
     currentChannel: string,
     channelsObj: ChannelObj,
-    currentChannelUsers: [],
     userName: string,
 }
 interface TypeingState {
@@ -39,9 +37,7 @@ export class App extends React.Component {
         socket: null,
         msg: "",
         msgs: [],
-        channels: [],
         channelsObj: {},
-        currentChannelUsers: [],
         currentChannel: null,
         auth: false,
         userName: "wsU " + Date.now() % 1000,
@@ -65,9 +61,9 @@ export class App extends React.Component {
         this.apiClient.authenticate(this.state.userName)
             .then(msg => this.setState({
                 auth: true,
-                channels: msg.payload.channels.map(c => c.name),
+                // channels: msg.payload.channels.map(c => c.name),
                 channelsObj: ((c) => { const obj = {}; c.forEach(c => obj[c.name] = c); return obj })(msg.payload.channels),
-                currentChannelUsers: msg.payload.channels[0].users,
+                // currentChannelUsers: msg.payload.channels[0].users,
                 currentChannel: msg.payload.channels[0].name
             }))
             .then(() => console.log("login recieved")).catch(e => console.log("didnt recive login in time", { e }))
@@ -93,8 +89,8 @@ export class App extends React.Component {
             write: (msg: HandledRequests) => this.sendToServer(this.state.socket, msg)
         },
         channels: {
-            onChannelUsersChanged: (msg) => this.removeChannel(msg.payload.channelLeft, msg.payload.user.username),
-            onNewChannel: (msg) => this.addChannel(msg.payload.channelName, msg.payload.userThatJoined),
+            onChannelUsersChanged: (msg) => this.removeChannel(msg.payload.channelLeft, msg.payload.user.username,msg),
+            onNewChannel: (msg) => this.addChannel(msg.payload.channelName, msg.payload.userThatJoined,msg),
         },
         messages: {
             onMessage: (msg) => {
@@ -145,48 +141,60 @@ export class App extends React.Component {
         }
     }
     startVideoBroadcast = async () => {
-        const partners = remove(this.state.currentChannelUsers, this.state.userName);
+        const users = this.state.channelsObj[this.state.currentChannel].users
+        
+        const partners = remove(users.slice(), this.state.userName);
         document.title = "[P]" + document.title
         await this.apiClient.offerVideo(partners);
         this.startLocalVideo((await this.getVideoStream()).stream);
     }
-    addChannel = (channelName, userThatJoined) => {
-        let { currentChannelUsers, channelsObj, channels } = this.state
-        const channelObj = channelsObj[channelName];
-        if (!channelsObj[channelName]) {
-            channels = [...this.state.channels, channelName]
-        } else if (userThatJoined !== this.state.userName) {
-            currentChannelUsers = ([...channelObj.users, userThatJoined] as any)
-            if (channelObj) {
-                channelsObj[channelName] = { ...channelObj, users: currentChannelUsers }
-            }
+    addChannel = (channelName, userThatJoined,msg:ChannelPostResponse) => {
+        let { channelsObj } = this.state
+        channelsObj = { ...channelsObj};
+        channelsObj[channelName] = {
+            name: channelName,
+            users: msg.payload.channelUsers
         }
         const displayName = userThatJoined === this.state.userName ? "You" : userThatJoined;
+        console.log("add chanel", { msg,channelName, userThatJoined }, {
+            msgs: [...this.state.msgs, `${displayName} joined ${channelName}`],
+            channelsObj})
+
         this.setState({
             msgs: [...this.state.msgs, `${displayName} joined ${channelName}`],
-            channels,
-            currentChannelUsers,
             channelsObj
         })
     }
-    removeChannel = (channelName, username) => {
-        let { currentChannelUsers, channelsObj } = this.state
-        if (channelsObj[channelName]) {
-            currentChannelUsers = (remove(channelsObj[channelName].users, username) as any)
-            channelsObj[channelName] = { ...channelsObj[channelName], users: currentChannelUsers }
-        } else {
-            console.log("unknown channel", { this: this, channelName, username });
+    removeChannel = (channelName, username,msg:ChannelLeaveResponse) => {
+        console.log("remove channel",{ channelName, username, msg});
+        let { channelsObj } = this.state
+        const channels = {};
+        if (channelsObj[channelName]){
+            Object.keys(channelsObj).forEach(k=>{
+                if(k !== channelName){
+                    channels[k] = channelsObj[k]
+                } else if (msg.payload.channelUsers.length>0){
+                    channels[k] = {
+                        channelName,
+                        users:msg.payload.channelUsers
+                    }
+                }
+            })
         }
         const displayName = username === this.state.userName ? "You" : username;
         this.setState({
             msgs: [...this.state.msgs, `${displayName} left ${channelName}`],
-            currentChannelUsers,
-            channelsObj
+            channelsObj:channels
         })
     }
+    
     createChannelPostMessage = (c) => this.apiClient.createChannel(c)
-        .then(r => this.setState({ msgs: [], msg: "", currentChannel: r.payload.channelName }))
+        .then(r => {
+            this.setState({ msgs: [], msg: "", currentChannel: r.payload.channelName });
+            this.addChannel(r.payload.channelName,this.state.userName,r);
+        })
         .catch(e => console.log("channel change not responsed to ", { e }))
+
     createTextmessage = () => this.apiClient.sendTextMessage(this.state.msg, this.state.currentChannel)
         .then(r => this.setState({
             msgs: [...this.state.msgs, `${newLineArt(r.payload.from.name, this.state.currentChannel)} ${r.payload.body}`],
@@ -197,7 +205,7 @@ export class App extends React.Component {
 
     render = () => (
         <section className="top" >
-            {console.log(this.state)}
+            {console.log("state",{state:this.state})}
             <Socketer
                 setSocket={(socket) => this.setSocketThenAuthenticate(socket)}
                 onMessage={(msg) => this.apiClient.receiveFromServer(msg)}
@@ -208,16 +216,22 @@ export class App extends React.Component {
             </div>
             <button onClick={() => this.startVideoBroadcast()}>vc</button>
             <div className="flex-row">
-                <ChannelBox
-                    channelsObj={this.state.channelsObj}
-                    createChannelPostMessage={this.createChannelPostMessage}
-                />
-                <MessageBox
-                    createTextmessage={this.createTextmessage}
-                    msgs={this.state.msgs}
-                    msg={this.state.msg}
-                    setMsg={e => this.setState({ msg: e.target.value })}
-                />
+                <div className="left-panel">
+                    <ChannelBox
+                        channelsObj={this.state.channelsObj}
+                        createChannelPostMessage={this.createChannelPostMessage}
+                    />
+                </div>
+                <div className="right-panel">
+                    <MessageBox
+                        createTextmessage={this.createTextmessage}
+                        msgs={this.state.msgs}
+                        msg={this.state.msg}
+                        setMsg={e => this.setState({ msg: e.target.value })}
+                    />
+                </div>
+
+
             </div>
             <VideosEl
                 partners={this.state.partners}

@@ -2,6 +2,7 @@ import { Request, Response, ActionTypes, DestinationTypes, MessageTypes, Destina
 
 import { User } from "../store/user/user";
 import { Store } from "../store/store";
+import { Channel } from "../store/channel/channel";
 
 const isChannelPostResponse = (msg: HandledResponses | UserPostResponse) => !!(msg as ChannelPostResponse).payload.userThatJoined
 const isChannelLeaveResponse = (msg: HandledResponses | UserPostResponse): msg is ChannelLeaveResponse => msg.type === MessageTypes.channelCommand && msg.action === ActionTypes.patch && !!msg.payload.channelLeft
@@ -65,9 +66,10 @@ export class ChannelPostRequest implements Request {
 }
 
 export class ChannelPostResponse extends Response<ChannelPostRequest> {
-    constructor(msg: ChannelPostRequest, user: User,isNew=false, public payload = {
+    constructor(msg: ChannelPostRequest, user: User,channel:Channel,isNew=false,public payload = {
         channelName: msg.payload.channelName,
         userThatJoined: user.username,
+        channelUsers:channel.users.toList().map(u=>u.username),
         isNew,
     }) { super(msg) }
 }
@@ -82,10 +84,11 @@ export class ChannelLeaveRequest implements Request {
     ) { }
 };
 export class ChannelLeaveResponse extends Response<ChannelLeaveRequest> {
-    constructor(msg: ChannelLeaveRequest, user: User,
+    constructor(msg: ChannelLeaveRequest, user: User,channel:Channel,
         public payload = {
             user: { username: user.username},
-            channelLeft: msg.payload.channelToLeave
+            channelLeft: msg.payload.channelToLeave,
+            channelUsers:channel.users.toList().map(u=>u.username)
         }
     ) { super(msg) }
 }

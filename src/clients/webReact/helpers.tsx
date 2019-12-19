@@ -1,7 +1,7 @@
 import * as React from "react";
 import { PartnersDict, ChannelObj} from "./app";
 import { useState, useEffect } from "react";
-import { websocketMessageEventName } from "../../lib/store/sockets/socket";
+import { websocketMessageEventName } from "../../lib/store/sockets/socketName";
 import io from 'socket.io-client';
 
 import { HandledResponses, UserPostRequest, UserPostResponse } from "../../lib/messages/messages";
@@ -36,8 +36,9 @@ export const ChannelBox = ({ channelsObj, createChannelPostMessage }: ChanProps)
     <div className="channelBox">
         <div>
             channels
-                    </div>
+        </div>
         <div>
+            <ChannelAdder postChannel={createChannelPostMessage}/>
             {Object.entries(channelsObj).map(([name, c]) => (
                 <div key={name} onClick={() => createChannelPostMessage(name)}
                 >
@@ -55,6 +56,28 @@ export const ChannelBox = ({ channelsObj, createChannelPostMessage }: ChanProps)
         </div>
     </div>
 )
+const ChannelAdder = ({postChannel})=>{
+    const [adding,setAdding] = useState(false);
+    const [name,setName] = useState("");
+    return (
+        <div>
+            {adding ?
+                <div>
+                    <input value={name} onChange={(e)=>setName(e.target.value)}/>
+                    <button onClick={()=>{
+                        setName("");
+                        setAdding(false);
+                        postChannel(name);
+                    }}>+</button>
+                </div>
+                :
+                <div onClick={() => setAdding(true)}>
+                    +
+                </div>
+            }
+        </div>
+    )
+}
 export const VideosEl = ({ partners, videoWebCamRef }: VidProps) => (
     <div className="videos flex-row">
         <div>

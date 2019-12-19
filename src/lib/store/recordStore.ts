@@ -9,7 +9,7 @@ export class RecordStore<T extends IdedEntity>{
     public add = (object: T) => { this.store[object.id] = object; return object };
     public remove = (object: T) => { delete this.store[object.id]; return object }
     public removeById = (id: number) => delete this.store[id]
-
+    public toList = ()=>Object.values(this.store);
     public get = (id: number) => this.store[id];
     public getBy = (cb:(item:T)=>Boolean):T=>Object.values(this.store).find(item=>cb(item));
 }
