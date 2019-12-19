@@ -24,6 +24,11 @@ export const TCPHTTPSwitchServer = (
         pingTimeout: 50000,
     });
     WebsocketServer.on("connection", socketHandler);
+    const webSocketHTTPS = IO(httpsServer, {
+        pingInterval: 10000,
+        pingTimeout: 50000,
+    });
+    webSocketHTTPS.on("connection", socketHandler);
 
     tcpServer.on('connection', (socket: Socket & { ['_handle']: any}) => {
         console.log("new TCP connection", { fd: socket && socket._handle && socket._handle.fd,});
@@ -52,7 +57,7 @@ export const TCPHTTPSwitchServer = (
     );
     tcpServer.on("error", (e) => console.error("tcp server", { e }));
     return {
-        tcpServer, httpServer, WebsocketServer, listen: (listenOptions, cb) => {
+        tcpServer, httpServer, WebsocketServer, httpsServer, webSocketHTTPS, listen: (listenOptions, cb) => {
         tcpServer.listen(listenOptions, cb);
         httpsServer.listen({port:443},()=>{console.log("https listening on port 443")});
     }};

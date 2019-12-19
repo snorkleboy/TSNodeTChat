@@ -103,7 +103,7 @@ export const Socketer = ({ setSocket, onMessage }) => {
     useEffect(() => {
         
 
-        let addr = `${window.location.origin}`
+        let addr = window.location.hostname + ":" + (window.location.port !== '443' ? window.location.port : 80);
         const socket = io(addr, {
             transports: ['websocket']
         });
