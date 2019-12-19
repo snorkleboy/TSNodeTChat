@@ -57,6 +57,7 @@ export class App extends React.Component {
     setSocketThenAuthenticate = (socket) => {
         document.title = this.state.userName;
         this.setState({ socket });
+        console.log("configugre api client");
         this.configureAPIClient()
         this.apiClient.authenticate(this.state.userName)
             .then(msg => this.setState({
@@ -205,7 +206,7 @@ export class App extends React.Component {
 
     render = () => (
         <section className="top" >
-            {console.log("state",{state:this.state})}
+            
             <Socketer
                 setSocket={(socket) => this.setSocketThenAuthenticate(socket)}
                 onMessage={(msg) => this.apiClient.receiveFromServer(msg)}

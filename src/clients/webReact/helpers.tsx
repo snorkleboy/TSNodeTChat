@@ -101,11 +101,13 @@ export const VideosEl = ({ partners, videoWebCamRef }: VidProps) => (
 )
 export const Socketer = ({ setSocket, onMessage }) => {
     useEffect(() => {
-        let addr = `${window.location.origin}:${window.location.protocol}`;
+        
+
+        let addr = `${window.location.origin}`
         const socket = io(addr, {
             transports: ['websocket']
         });
-
+        console.log("socketer start",{addr});
         ["error", "connect_error", "connect_timeout", "reconnect", "reconnecting", "reconnect_error", "reconnect_failed", "dissconnect"]
             .forEach(ev => {
                 socket.on(ev, (e) => console.log(ev, { e }))
