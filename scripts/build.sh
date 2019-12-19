@@ -6,5 +6,4 @@ rm -Rf ./build
 echo "building backend";
 npx tsc --p ./tsconfig.json
 echo "building frontend";
-npx tsc --p ./tsconfig.json
 npx webpack

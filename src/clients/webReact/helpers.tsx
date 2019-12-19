@@ -101,9 +101,7 @@ export const VideosEl = ({ partners, videoWebCamRef }: VidProps) => (
 )
 export const Socketer = ({ setSocket, onMessage }) => {
     useEffect(() => {
-        let addr = "localhost";
-        addr = "localhost"
-        addr = addr + ":3005";
+        let addr = `${window.location.origin}:${window.location.protocol}`;
         const socket = io(addr, {
             transports: ['websocket']
         });

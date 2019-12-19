@@ -3,7 +3,6 @@ import { peekIsHttp } from "./util/peakIsHttp";
 import IO from "socket.io";
 import {Server, Socket} from "net"
 import { RawSocket } from '../lib/store/sockets/socket';
-const port = 3005;
 
 
 export const TCPHTTPSwitchServer = (
