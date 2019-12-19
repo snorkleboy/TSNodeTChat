@@ -7,35 +7,12 @@ import { httpApp } from "./httpApp";
 import { User } from "../lib/store/user/user";
 import { Socket as tcpsocket } from "net";
 import { TCPSocketWrapper, RawSocket } from "../lib/store/sockets/socket";
-import * as fs from 'fs';
-
+import setupLogger from "./util/logger"
 const env = process.env.enviroment || 'development';
 const config = require(`./config/config.${env}.js`).default
+
+setupLogger();
 console.log({env,config});
-const myLogFileStream = fs.createWriteStream("./logs/server.log");
-const myConsole = new console.Console(myLogFileStream, myLogFileStream);
-const oldLog = console.log;
-const oldErr = console.error;
-const dayMs = 1000 * 60 * 60 * 24
-const getDateStamp = ()=>{
-    const date = Date.now();
-    const days = parseInt((date / dayMs) as any);
-    const leftOver = (date % dayMs);
-    const s = parseInt((leftOver % 60000)/1000 as any);
-    const min = parseInt((leftOver/60000) as any);
-    return `${days}:${min}:${s} -`
-}
-console.log = function (...args) {
-    const timeStampedArgs = [getDateStamp(),...args];
-    oldLog(...args);
-    myConsole.log(...timeStampedArgs);
-}
-console.error = function (...args) {
-    const timeStampedArgs = [getDateStamp(), ...args];
-    oldErr(...args);
-    myConsole.error(...timeStampedArgs);
-}
-console.log("timeStamp format = Days:minutes:seconds")
 
 
 const listenOptions = {

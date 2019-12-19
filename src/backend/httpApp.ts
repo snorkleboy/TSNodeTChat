@@ -16,6 +16,7 @@ const mimeType = {
 function httpApp(req, res) {
     // parse URL
     const parsedUrl = url.parse(req.url);
+    console.log("httpApp", { parsedUrl:parsedUrl.pathname});
     if(parsedUrl.path === "/state"){
         console.log("state return");
         res.setHeader('Content-type', mimeType[".json"] || 'text/plain');

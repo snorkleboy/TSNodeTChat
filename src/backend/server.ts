@@ -1,18 +1,24 @@
-import { createServer as createHTTPServer} from 'http';
+import { createServer as createHTTPSServer} from 'https';
+import { createServer as createHTTPServer } from 'http';
+
 import { peekIsHttp } from "./util/peakIsHttp";
 import IO from "socket.io";
 import {Server, Socket} from "net"
 import { RawSocket } from '../lib/store/sockets/socket';
+const fs = require('fs');
 
-
+const httpsOptions = {
+    key: fs.readFileSync('./server.key'),
+    cert: fs.readFileSync('./server.cert')
+}
 export const TCPHTTPSwitchServer = (
     socketHandler:(s:RawSocket,httpReRout:(m)=>void)=>void,
     httpRequestHandler,
-    options={}
 ) => {
     console.log("server start");
     const tcpServer = new Server();
     const httpServer = createHTTPServer(httpRequestHandler);
+    const httpsServer = createHTTPSServer(httpsOptions,httpRequestHandler);
     const WebsocketServer = IO(httpServer,{
         pingInterval: 10000,
         pingTimeout: 50000,
@@ -23,7 +29,7 @@ export const TCPHTTPSwitchServer = (
         console.log("new TCP connection", { fd: socket && socket._handle && socket._handle.fd,});
         return peekIsHttp(socket)
             .then(({ httpBool, msg }) => {
-                console.log("TCP peaked for http", { httpBool, fd: socket && socket._handle && socket._handle.fd, });
+                console.log("TCP peaked http", { httpBool, fd: socket && socket._handle && socket._handle.fd, });
                 try {
                     const handleHTTP = (m)=>{
                         httpServer.emit("connection", socket);
@@ -45,5 +51,9 @@ export const TCPHTTPSwitchServer = (
     }
     );
     tcpServer.on("error", (e) => console.error("tcp server", { e }));
-    return { tcpServer, httpServer, WebsocketServer, listen: (listenOptions, cb) => tcpServer.listen(listenOptions, cb)};
+    return {
+        tcpServer, httpServer, WebsocketServer, listen: (listenOptions, cb) => {
+        tcpServer.listen(listenOptions, cb);
+        httpsServer.listen({port:443},()=>{console.log("https listening on port 443")});
+    }};
 }
