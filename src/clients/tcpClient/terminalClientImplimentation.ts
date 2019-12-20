@@ -46,7 +46,7 @@ export const startClient = (port, address) => {
                 tcpClient.receiveFromServer(json)
             } catch (error) {
                 if (this.debug) {
-                    console.warn("couldnt parse message");
+                    console.warn("couldnt parse/handle message");
                 }
             }
         });

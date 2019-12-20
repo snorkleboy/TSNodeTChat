@@ -13,15 +13,26 @@ export default ()=>{
         const min = parseInt((leftOver / 60000) as any);
         return `${days}:${min}:${s} -`
     }
+
     console.log = function (...args) {
         const timeStampedArgs = [getDateStamp(), ...args];
         oldLog(...args);
         myConsole.log(...timeStampedArgs);
     }
+
     console.error = function (...args) {
         const timeStampedArgs = [getDateStamp(), ...args];
         oldErr(...args);
         myConsole.error(...timeStampedArgs);
     }
+    const bigLog =  (args,logger,deepLogger)=>{
+        args = [...args];
+        const lastArg = args.splice(args.length-1,1);
+        logger(...args);
+        deepLogger(...args,lastArg)
+    };
+    console['bigError'] = (...args)=>bigLog(args,console.error,myConsole);
+    console['bigLog'] = (...args) => bigLog(args, console.log, myConsole);
+
     console.log("timeStamp format = Days:minutes:seconds")
 }

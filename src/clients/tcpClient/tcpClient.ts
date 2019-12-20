@@ -101,11 +101,11 @@ export class TCPClient{
         }
         if (w !== 'n' && areNums) {
             sendToServer(new WebRTCAnswerOffer(
-                offerMsg,
-                { username: this.state.name },
-                { width: w, height: h },
-                true
-            )
+                    offerMsg,
+                    { username: this.state.name },
+                    { width: w, height: h },
+                    true
+                )
             )
         } else {
             sendToClient("declined video offer");
@@ -134,7 +134,7 @@ export class TCPClient{
             },
             videos: {
                 dwsVideo:{
-                    onDWSVideo: (m) => sendToClient(m.payload.video),
+                    onDWSVideo: (m) => sendToClient(`${m.payload.video} \n${this.getMessageList()}`),
                     onVideoOfferedToThis: (msg) => {
                         this.state.videoPartner = msg.payload.from;
                         return this.promptClient(
@@ -151,7 +151,7 @@ export class TCPClient{
     protected getMessageList = () => this.state.msgs.join("\n");
     protected addClientMessage = (m:string)=>{
         const length = this.state.msgs.length;
-        this.state.msgs = [...this.state.msgs.slice(length - 15, length), m];
+        this.state.msgs = [...this.state.msgs.slice(length - 5, length), m];
         return this.getMessageList()+"\n";
     }
     protected lineStart = (othername: string = null) => `${newLineArt(othername || this.state.name, this.state.channel.name)}`
